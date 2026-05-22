@@ -1,0 +1,154 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===========================================================================
+   Design tokens — un solo set de variables que cambia con la clase .dark.
+   Los valores son tripletes RGB para poder usar opacidad (rgb(var(--c) / .5)).
+   =========================================================================== */
+:root {
+  --c-app: 248 248 250; /* fondo de página */
+  --c-panel: 255 255 255; /* tarjetas / superficies */
+  --c-inset: 244 244 245; /* inputs / huecos / hover */
+  --c-line: 228 228 231; /* bordes */
+  --c-fg: 24 24 27; /* texto principal */
+  --c-muted: 82 82 91; /* texto secundario */
+  --c-faint: 113 113 122; /* texto terciario */
+  --c-accent: 99 102 241; /* indigo-500 */
+  color-scheme: light;
+}
+
+.dark {
+  --c-app: 9 9 11;
+  --c-panel: 24 24 27;
+  --c-inset: 39 39 42;
+  --c-line: 39 39 42;
+  --c-fg: 244 244 245;
+  --c-muted: 161 161 170;
+  --c-faint: 113 113 122;
+  --c-accent: 129 140 248; /* indigo-400, más vivo sobre fondo oscuro */
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-app font-sans text-fg antialiased;
+  margin: 0;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
+}
+
+/* Scrollbars sutiles */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--c-line)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgb(var(--c-line));
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--c-faint) / 0.6);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- Leaflet, adaptado a los tokens ---- */
+.leaflet-container {
+  background: rgb(var(--c-inset));
+  font: inherit;
+  outline: none;
+}
+.leaflet-control-attribution {
+  background: rgb(var(--c-panel) / 0.75) !important;
+  color: rgb(var(--c-faint)) !important;
+  font-size: 10px !important;
+  backdrop-filter: blur(4px);
+}
+.leaflet-control-attribution a {
+  color: rgb(var(--c-muted)) !important;
+}
+.leaflet-bar a {
+  background: rgb(var(--c-panel)) !important;
+  color: rgb(var(--c-fg)) !important;
+  border-color: rgb(var(--c-line)) !important;
+}
+.leaflet-bar a:hover {
+  background: rgb(var(--c-inset)) !important;
+}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: rgb(var(--c-panel)) !important;
+  color: rgb(var(--c-fg)) !important;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.25) !important;
+  border: 1px solid rgb(var(--c-line));
+}
+.leaflet-popup-content {
+  margin: 10px 12px;
+}
+.leaflet-popup-close-button {
+  color: rgb(var(--c-faint)) !important;
+}
+
+/* ---- Marker de rider (divIcon) ---- */
+.rider-marker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rider-marker .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid rgb(var(--c-panel));
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.25),
+    0 2px 6px rgb(0 0 0 / 0.4);
+  background: currentColor;
+  transition:
+    width 0.2s ease,
+    height 0.2s ease;
+}
+.rider-marker .ring {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  opacity: 0;
+}
+.rider-marker.is-active .ring {
+  animation: rider-pulse 1.9s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+.rider-marker.is-selected .dot {
+  width: 20px;
+  height: 20px;
+}
+
+@keyframes rider-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.7;
+  }
+  70%,
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+.leaflet-marker-icon.rider-marker-wrap {
+  transition: transform 0.9s linear;
+}

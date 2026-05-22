@@ -1,0 +1,144 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import clsx from 'clsx'
+import { MapContainer, TileLayer, useMap } from 'react-leaflet'
+import { Maximize2, Minimize2 } from 'lucide-react'
+import {
+  MAP_TILES,
+  MAP_DEFAULT_CENTER,
+  MAP_DEFAULT_ZOOM,
+  STATUS,
+  STATUS_ORDER,
+} from '../../config/constants'
+import { useApp, filterRiders } from '../../state/AppContext'
+import { useFleet } from '../../state/useFleetData'
+import { useTheme } from '../../state/ThemeContext'
+import RiderMarker from './RiderMarker'
+
+function FitBounds({ riders }) {
+  const map = useMap()
+  const done = useRef(false)
+  useEffect(() => {
+    if (done.current) return
+    const pts = riders.filter((r) => r.location).map((r) => [r.location.lat, r.location.lng])
+    if (pts.length) {
+      map.fitBounds(pts, { padding: [48, 48], maxZoom: 13 })
+      done.current = true
+    }
+  }, [riders, map])
+  return null
+}
+
+function FlyToSelected({ riders, selectedId }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!selectedId) return
+    const r = riders.find((x) => x.id === selectedId)
+    if (r?.location) {
+      map.flyTo([r.location.lat, r.location.lng], Math.max(map.getZoom(), 14), { duration: 0.8 })
+    }
+  }, [selectedId, riders, map])
+  return null
+}
+
+// Recalcula el tamaño del mapa cuando cambia el contenedor (p.ej. al entrar/salir de fullscreen).
+function InvalidateSize({ trigger }) {
+  const map = useMap()
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 220)
+    return () => clearTimeout(t)
+  }, [trigger, map])
+  return null
+}
+
+function MapLegend() {
+  return (
+    <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-col gap-1 rounded-lg border border-line bg-panel/90 px-2.5 py-2 text-[11px] shadow-soft backdrop-blur">
+      {STATUS_ORDER.map((id) => {
+        const s = STATUS[id]
+        return (
+          <div key={id} className="flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full" style={{ background: s.hex }} />
+            <span className="text-muted">{s.label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function FleetMap({ height = 'h-[360px] md:h-[440px]' }) {
+  const { filters, selectedRiderId, selectRider } = useApp()
+  const { riders } = useFleet()
+  const { resolved } = useTheme()
+  const [fullscreen, setFullscreen] = useState(false)
+  const visible = useMemo(() => filterRiders(riders, filters), [riders, filters])
+
+  useEffect(() => {
+    if (!fullscreen) return undefined
+    function onKey(e) {
+      if (e.key === 'Escape') setFullscreen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [fullscreen])
+
+  return (
+    <div
+      className={clsx(
+        // `isolate` contiene los z-index internos de Leaflet para que no tapen overlays (palette, drawer…)
+        'isolate overflow-hidden border-line shadow-soft',
+        fullscreen
+          ? 'fixed inset-0 z-[60] rounded-none border-0'
+          : `relative ${height} rounded-xl border`,
+      )}
+    >
+      <MapContainer
+        center={MAP_DEFAULT_CENTER}
+        zoom={MAP_DEFAULT_ZOOM}
+        className="h-full w-full"
+        zoomControl
+        attributionControl
+      >
+        <TileLayer
+          key={resolved}
+          url={resolved === 'light' ? MAP_TILES.light : MAP_TILES.dark}
+          attribution={MAP_TILES.attribution}
+          maxZoom={MAP_TILES.maxZoom}
+          subdomains="abcd"
+        />
+        <FitBounds riders={riders} />
+        <FlyToSelected riders={riders} selectedId={selectedRiderId} />
+        <InvalidateSize trigger={fullscreen} />
+        {visible.map((r) => (
+          <RiderMarker
+            key={r.id}
+            rider={r}
+            selected={r.id === selectedRiderId}
+            onSelect={selectRider}
+          />
+        ))}
+      </MapContainer>
+
+      <MapLegend />
+
+      <div className="pointer-events-none absolute right-3 top-3 z-[500] flex items-center gap-2">
+        <span className="rounded-lg border border-line bg-panel/90 px-2.5 py-1 text-[11px] text-muted shadow-soft backdrop-blur">
+          {visible.length} riders visibles
+        </span>
+        <button
+          onClick={() => setFullscreen((f) => !f)}
+          title={fullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+          aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+          className="pointer-events-auto rounded-lg border border-line bg-panel/90 p-1.5 text-muted shadow-soft backdrop-blur transition hover:text-fg"
+        >
+          {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  )
+}

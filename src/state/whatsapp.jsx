@@ -1,4 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import { useAuth } from './AuthContext'
 
 const WhatsAppContext = createContext(null)
 
@@ -8,104 +10,148 @@ export function useWhatsApp() {
   return ctx
 }
 
-const SETTINGS_KEY = 'ul-wa-settings'
-const LOG_KEY = 'ul-wa-log'
+const DEFAULT_CONTACT = 'Hola {nombre}, te contactamos desde operaciones.'
 const LOG_CAP = 300
 
-const DEFAULT_SETTINGS = {
-  contactMessage: 'Hola {nombre}, te contactamos desde operaciones.',
-  quickTemplates: [
-    { id: 't1', title: 'Confirmar disponibilidad', text: 'Hola {nombre}, ¿puedes confirmar tu disponibilidad para el turno de hoy?' },
-    { id: 't2', title: 'Recordatorio de turno', text: 'Atención {nombre}: tu turno empieza en 15 minutos. ¿Estás en camino?' },
-    { id: 't3', title: 'Incidencia en pedido', text: 'Incidencia detectada en tu pedido {pedido_id}. Contacta con operaciones.' },
-  ],
-  metaConfig: { phoneNumberId: '', businessAccountId: '' }, // el token NO se persiste
+function rowToTemplate(r) {
+  return { id: r.id, title: r.title, text: r.text }
 }
-
-function loadSettings() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null')
-    if (!parsed) return DEFAULT_SETTINGS
-    return {
-      contactMessage: parsed.contactMessage ?? DEFAULT_SETTINGS.contactMessage,
-      quickTemplates:
-        Array.isArray(parsed.quickTemplates) && parsed.quickTemplates.length
-          ? parsed.quickTemplates
-          : DEFAULT_SETTINGS.quickTemplates,
-      metaConfig: {
-        phoneNumberId: parsed.metaConfig?.phoneNumberId ?? '',
-        businessAccountId: parsed.metaConfig?.businessAccountId ?? '',
-      },
-    }
-  } catch {
-    return DEFAULT_SETTINGS
+function rowToLog(r) {
+  return {
+    id: r.id,
+    ts: r.ts ? Date.parse(r.ts) : Date.now(),
+    riderId: r.rider_id ?? null,
+    riderName: r.rider_name ?? '',
+    phone: r.phone ?? '',
+    message: r.message ?? '',
+    status: r.status ?? 'abierto',
+    channel: r.channel ?? 'wa.me',
   }
 }
 
-function loadLog() {
-  try {
-    return JSON.parse(localStorage.getItem(LOG_KEY) || '[]')
-  } catch {
-    return []
-  }
-}
-
-let logSeq = 0
-
+// Persistencia en Supabase (Postgres + Realtime). El token de Meta NUNCA se guarda
+// (solo en memoria). Plantillas/ajustes se escriben con debounce para no hacer una
+// query por pulsación; el log de envíos se sincroniza en vivo entre el equipo.
 export function WhatsAppProvider({ children }) {
-  const [settings, setSettings] = useState(loadSettings)
+  const { user } = useAuth()
+
+  const [contactMessage, setContactMessageState] = useState(DEFAULT_CONTACT)
+  const [metaConfig, setMetaConfigState] = useState({ phoneNumberId: '', businessAccountId: '' })
+  const [quickTemplates, setQuickTemplates] = useState([])
   const [metaToken, setMetaToken] = useState('') // solo en memoria
-  const [sentLog, setSentLog] = useState(loadLog)
+  const [sentLog, setSentLog] = useState([])
   const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const writeTimers = useRef({})
 
+  // Carga inicial desde Postgres (el provider solo monta con sesión activa).
   useEffect(() => {
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
-    } catch {
-      /* ignore */
+    let alive = true
+    ;(async () => {
+      const [tpls, st, log] = await Promise.all([
+        supabase.from('wa_templates').select('*').order('created_at', { ascending: true }),
+        supabase.from('app_settings').select('*').eq('id', 1).maybeSingle(),
+        supabase.from('wa_sent_log').select('*').order('ts', { ascending: false }).limit(LOG_CAP),
+      ])
+      if (!alive) return
+      if (tpls.data) setQuickTemplates(tpls.data.map(rowToTemplate))
+      if (st.data) {
+        setContactMessageState(st.data.contact_message ?? DEFAULT_CONTACT)
+        setMetaConfigState({
+          phoneNumberId: st.data.meta_phone_number_id ?? '',
+          businessAccountId: st.data.meta_business_account_id ?? '',
+        })
+      }
+      if (log.data) setSentLog(log.data.map(rowToLog))
+    })()
+    return () => {
+      alive = false
     }
-  }, [settings])
+  }, [])
 
+  // Realtime: el log de envíos se actualiza en vivo para todo el equipo.
   useEffect(() => {
-    try {
-      localStorage.setItem(LOG_KEY, JSON.stringify(sentLog.slice(0, LOG_CAP)))
-    } catch {
-      /* ignore */
+    const ch = supabase
+      .channel('wa_sent_log_rt')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'wa_sent_log' },
+        (payload) => {
+          const row = rowToLog(payload.new)
+          setSentLog((prev) =>
+            prev.some((m) => m.id === row.id) ? prev : [row, ...prev].slice(0, LOG_CAP),
+          )
+        },
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(ch)
     }
-  }, [sentLog])
+  }, [])
+
+  const persistSettings = useCallback((patch) => {
+    clearTimeout(writeTimers.current.settings)
+    writeTimers.current.settings = setTimeout(() => {
+      supabase
+        .from('app_settings')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', 1)
+        .then(({ error }) => {
+          // eslint-disable-next-line no-console
+          if (error) console.error('[wa] settings:', error.message)
+        })
+    }, 500)
+  }, [])
 
   const setContactMessage = useCallback(
-    (contactMessage) => setSettings((s) => ({ ...s, contactMessage })),
-    [],
+    (msg) => {
+      setContactMessageState(msg)
+      persistSettings({ contact_message: msg })
+    },
+    [persistSettings],
   )
+
   const setMetaConfig = useCallback(
-    (patch) => setSettings((s) => ({ ...s, metaConfig: { ...s.metaConfig, ...patch } })),
-    [],
+    (patch) => {
+      setMetaConfigState((s) => {
+        const next = { ...s, ...patch }
+        persistSettings({
+          meta_phone_number_id: next.phoneNumberId,
+          meta_business_account_id: next.businessAccountId,
+        })
+        return next
+      })
+    },
+    [persistSettings],
   )
 
   const addTemplate = useCallback(
-    (tpl) =>
-      setSettings((s) => ({
-        ...s,
-        quickTemplates: [
-          ...s.quickTemplates,
-          { id: `t${Date.now()}`, title: tpl.title || 'Sin título', text: tpl.text || '' },
-        ],
-      })),
-    [],
+    async (tpl) => {
+      const row = { title: tpl.title || 'Sin título', text: tpl.text || '', created_by: user?.id ?? null }
+      const { data, error } = await supabase.from('wa_templates').insert(row).select().single()
+      if (!error && data) setQuickTemplates((prev) => [...prev, rowToTemplate(data)])
+    },
+    [user],
   )
-  const updateTemplate = useCallback(
-    (id, patch) =>
-      setSettings((s) => ({
-        ...s,
-        quickTemplates: s.quickTemplates.map((t) => (t.id === id ? { ...t, ...patch } : t)),
-      })),
-    [],
-  )
-  const removeTemplate = useCallback(
-    (id) => setSettings((s) => ({ ...s, quickTemplates: s.quickTemplates.filter((t) => t.id !== id) })),
-    [],
-  )
+
+  const updateTemplate = useCallback((id, patch) => {
+    setQuickTemplates((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+    clearTimeout(writeTimers.current['t:' + id])
+    writeTimers.current['t:' + id] = setTimeout(() => {
+      supabase
+        .from('wa_templates')
+        .update({ ...patch, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .then(({ error }) => {
+          // eslint-disable-next-line no-console
+          if (error) console.error('[wa] template:', error.message)
+        })
+    }, 500)
+  }, [])
+
+  const removeTemplate = useCallback(async (id) => {
+    setQuickTemplates((prev) => prev.filter((t) => t.id !== id))
+    await supabase.from('wa_templates').delete().eq('id', id)
+  }, [])
 
   const toggleSelect = useCallback((id) => {
     setSelectedIds((prev) => {
@@ -127,29 +173,43 @@ export function WhatsAppProvider({ children }) {
   }, [])
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
 
-  const logSent = useCallback((entries) => {
-    const arr = Array.isArray(entries) ? entries : [entries]
-    const now = Date.now()
-    const mapped = arr.map((e) => {
-      logSeq += 1
-      return {
-        id: `wa-${now}-${logSeq}`,
-        ts: e.ts ?? now,
-        riderId: e.riderId ?? null,
-        riderName: e.riderName ?? '',
+  const logSent = useCallback(
+    async (entries) => {
+      const arr = Array.isArray(entries) ? entries : [entries]
+      const rows = arr.map((e) => ({
+        rider_id: e.riderId ?? null,
+        rider_name: e.riderName ?? '',
         phone: e.phone ?? '',
         message: e.message ?? '',
         status: e.status ?? 'abierto',
         channel: e.channel ?? 'wa.me',
+        sent_by: user?.id ?? null,
+      }))
+      const { data, error } = await supabase.from('wa_sent_log').insert(rows).select()
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('[wa] logSent:', error.message)
+        return
       }
-    })
-    setSentLog((prev) => [...mapped, ...prev].slice(0, LOG_CAP))
-  }, [])
+      const mapped = (data || []).map(rowToLog)
+      setSentLog((prev) => {
+        const have = new Set(prev.map((m) => m.id))
+        const fresh = mapped.filter((m) => !have.has(m.id))
+        return [...fresh, ...prev].slice(0, LOG_CAP)
+      })
+    },
+    [user],
+  )
 
   const messagesToday = useMemo(() => {
     const start = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00').getTime()
     return sentLog.filter((m) => m.ts >= start).length
   }, [sentLog])
+
+  const settings = useMemo(
+    () => ({ contactMessage, quickTemplates, metaConfig }),
+    [contactMessage, quickTemplates, metaConfig],
+  )
 
   const value = useMemo(
     () => ({

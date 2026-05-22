@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { Menu, RefreshCw, LogOut, Zap, Search } from 'lucide-react'
+import { Menu, RefreshCw, LogOut, Zap, Search, Power } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
+import { useAuth } from '../../state/AuthContext'
 import { useFleet } from '../../state/useFleetData'
 import { ENVIRONMENTS } from '../../config/constants'
 import LiveIndicator from '../common/LiveIndicator'
@@ -19,6 +20,7 @@ const KBD = isMac ? '⌘K' : 'Ctrl K'
 
 export default function Topbar({ onToggleMobile, onOpenPalette }) {
   const { activeNav, demoMode, environment, disconnect } = useApp()
+  const { user, signOut } = useAuth()
   const { secondsUntilRefresh, refreshNow, error } = useFleet()
   const [spinning, setSpinning] = useState(false)
 
@@ -90,10 +92,24 @@ export default function Topbar({ onToggleMobile, onOpenPalette }) {
         <button
           onClick={disconnect}
           className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-muted transition hover:bg-inset hover:text-fg"
+          title="Volver a la pantalla de conexión de Uber"
         >
           <LogOut className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Desconectar</span>
         </button>
+        <div className="flex items-center gap-1.5 border-l border-line pl-2 sm:pl-3">
+          <span className="hidden max-w-[140px] truncate text-xs text-faint lg:inline" title={user?.email}>
+            {user?.email}
+          </span>
+          <button
+            onClick={signOut}
+            className="rounded-lg p-1.5 text-muted transition hover:bg-red-500/10 hover:text-red-500"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+          >
+            <Power className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </header>
   )

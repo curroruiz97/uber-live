@@ -228,7 +228,9 @@ export default function DashboardLayout() {
         <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
         <div className={clsx('transition-all duration-200', app.sidebarCollapsed ? 'md:pl-16' : 'md:pl-60')}>
           <Topbar onToggleMobile={() => setMobileOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
-          <main className="p-4">{fleet.loading ? <LoadingState /> : <Content activeNav={app.activeNav} />}</main>
+          <main className="overflow-x-clip p-3 sm:p-4">
+            {fleet.loading ? <LoadingState /> : <Content activeNav={app.activeNav} />}
+          </main>
         </div>
       </div>
       <RiderDetailDrawer />

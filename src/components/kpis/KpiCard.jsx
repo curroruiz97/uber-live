@@ -51,11 +51,11 @@ export default function KpiCard({ label, value, decimals = 0, suffix, format, ic
         )}
       </div>
       <div className="mt-3 flex items-end justify-between gap-2">
-        <div className="flex items-baseline gap-1.5">
+        <div className="flex min-w-0 items-baseline gap-1.5">
           {format === 'mmss' ? (
-            <span className="font-mono text-2xl font-semibold tabular-nums text-fg">{mmss(value)}</span>
+            <span className="font-mono text-xl font-semibold tabular-nums text-fg sm:text-2xl">{mmss(value)}</span>
           ) : (
-            <CountUp value={value} decimals={decimals} className="text-2xl font-semibold tabular-nums text-fg" />
+            <CountUp value={value} decimals={decimals} className="text-xl font-semibold tabular-nums text-fg sm:text-2xl" />
           )}
           {suffix && <span className="text-sm text-faint">{suffix}</span>}
           <DeltaChip delta={delta} />

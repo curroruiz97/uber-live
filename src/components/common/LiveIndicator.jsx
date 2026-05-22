@@ -5,7 +5,7 @@ export default function LiveIndicator({ seconds }) {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
       </span>
-      <span className="font-semibold tracking-wide text-emerald-600 dark:text-emerald-400">EN VIVO</span>
+      <span className="hidden font-semibold tracking-wide text-emerald-600 dark:text-emerald-400 sm:inline">EN VIVO</span>
       {typeof seconds === 'number' && (
         <span className="tabular-nums text-faint">· {seconds}s</span>
       )}

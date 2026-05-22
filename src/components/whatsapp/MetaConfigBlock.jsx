@@ -101,7 +101,7 @@ export default function MetaConfigBlock() {
             ))}
           </div>
           {mode === 'template' && (
-            <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Field label="Nombre de plantilla" value={templateName} onChange={setTemplateName} placeholder="turno_recordatorio" />
               <Field label="Idioma (lang code)" value={langCode} onChange={setLangCode} placeholder="es" />
             </div>

@@ -88,7 +88,7 @@ export default function RidersTable() {
       </div>
 
       {selectedIds.size > 0 && (
-        <div className="flex items-center justify-between gap-2 border-b border-line bg-accent/5 px-4 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-accent/5 px-4 py-2">
           <span className="text-sm font-medium text-fg">{selectedIds.size} seleccionados</span>
           <div className="flex items-center gap-2">
             <button
@@ -107,6 +107,7 @@ export default function RidersTable() {
         </div>
       )}
 
+      <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left">
         <thead className="bg-inset/40">
           <tr className="border-b border-line">
@@ -152,6 +153,7 @@ export default function RidersTable() {
           ))}
         </tbody>
       </table>
+      </div>
 
       {sorted.length === 0 ? (
         <EmptyState

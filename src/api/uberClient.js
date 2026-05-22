@@ -3,7 +3,7 @@
 // reenvía las llamadas. Opcionalmente se pasa un token ya minteado (se reenvía tal cual).
 // Así el secret nunca llega al navegador y no hay problemas de CORS.
 
-import { API_BASE, authHeaders } from '../config/api'
+import { UBER_FN_BASE, SUPABASE_ANON_KEY, authHeaders } from '../config/api'
 
 export class ApiError extends Error {
   constructor(message, kind, status) {
@@ -16,16 +16,20 @@ export class ApiError extends Error {
 
 async function request(path, { environment, token, signal } = {}) {
   const sep = path.includes('?') ? '&' : '?'
-  const url = `${API_BASE}/api/uber${path}${sep}env=${encodeURIComponent(environment || 'sandbox')}`
+  const url = `${UBER_FN_BASE}${path}${sep}env=${encodeURIComponent(environment || 'sandbox')}`
 
-  const headers = { ...(token ? { 'x-uber-token': token } : {}), ...(await authHeaders()) }
+  const headers = {
+    apikey: SUPABASE_ANON_KEY,
+    ...(token ? { 'x-uber-token': token } : {}),
+    ...(await authHeaders()),
+  }
   let res
   try {
     res = await fetch(url, { headers, signal })
   } catch (e) {
     if (e?.name === 'AbortError') throw new ApiError('Petición cancelada.', 'abort')
     throw new ApiError(
-      'El proxy local no responde. Arranca "npm run dev" para levantar el proxy de Uber.',
+      'No se pudo contactar con el proxy de Uber (Edge Function de Supabase).',
       'network',
     )
   }

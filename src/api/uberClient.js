@@ -3,7 +3,7 @@
 // reenvía las llamadas. Opcionalmente se pasa un token ya minteado (se reenvía tal cual).
 // Así el secret nunca llega al navegador y no hay problemas de CORS.
 
-import { API_BASE } from '../config/api'
+import { API_BASE, authHeaders } from '../config/api'
 
 export class ApiError extends Error {
   constructor(message, kind, status) {
@@ -18,9 +18,10 @@ async function request(path, { environment, token, signal } = {}) {
   const sep = path.includes('?') ? '&' : '?'
   const url = `${API_BASE}/api/uber${path}${sep}env=${encodeURIComponent(environment || 'sandbox')}`
 
+  const headers = { ...(token ? { 'x-uber-token': token } : {}), ...(await authHeaders()) }
   let res
   try {
-    res = await fetch(url, { headers: token ? { 'x-uber-token': token } : {}, signal })
+    res = await fetch(url, { headers, signal })
   } catch (e) {
     if (e?.name === 'AbortError') throw new ApiError('Petición cancelada.', 'abort')
     throw new ApiError(

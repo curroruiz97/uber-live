@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { QrCode, Loader2, Power, AlertTriangle, ShieldAlert } from 'lucide-react'
 import CollapsibleCard from '../common/CollapsibleCard'
-import { API_BASE } from '../../config/api'
+import { API_BASE, authHeaders } from '../../config/api'
 
 const POLL_MS = 1500
 
 async function waGet(path) {
-  const r = await fetch(`${API_BASE}/api/wa${path}`)
+  const r = await fetch(`${API_BASE}/api/wa${path}`, { headers: await authHeaders() })
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return r.json()
 }
 async function waPost(path) {
-  const r = await fetch(`${API_BASE}/api/wa${path}`, { method: 'POST' })
+  const r = await fetch(`${API_BASE}/api/wa${path}`, { method: 'POST', headers: await authHeaders() })
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return r.json()
 }

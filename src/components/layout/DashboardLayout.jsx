@@ -16,6 +16,7 @@ import Skeleton from '../common/Skeleton'
 import WhatsAppView from '../whatsapp/WhatsAppView'
 import MensatekView from '../mensatek/MensatekView'
 import SettingsLayout from '../settings/SettingsLayout'
+import TrialBanner from '../billing/TrialBanner'
 
 function LoadingState() {
   return (
@@ -128,6 +129,7 @@ export default function DashboardLayout() {
         <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
         <div className={clsx('transition-all duration-200', app.sidebarCollapsed ? 'md:pl-16' : 'md:pl-60')}>
           <Topbar onToggleMobile={() => setMobileOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
+          <TrialBanner />
           <main className="overflow-x-clip p-3 sm:p-4">
             {fleet.loading ? <LoadingState /> : <Content activeNav={app.activeNav} />}
           </main>

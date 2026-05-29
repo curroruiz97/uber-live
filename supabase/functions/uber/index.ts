@@ -292,7 +292,12 @@ Deno.serve(async (req) => {
     }
 
     if (path === '/ping') return json(200, await ping(orgId, creds, envName, pastedToken, scopeOverride))
-    if (path === '/fleet') return json(200, await fetchFleet(orgId, creds, envName, pastedToken, scopeOverride))
+    if (path === '/fleet') {
+      const fleet = await fetchFleet(orgId, creds, envName, pastedToken, scopeOverride)
+      const { data: sub } = await adminClient.from('subscriptions').select('rider_limit').eq('org_id', orgId).maybeSingle()
+      const riderLimit = sub?.rider_limit ?? null
+      return json(200, { ...fleet, riderLimit, overLimit: riderLimit != null && (fleet.riders?.length || 0) > riderLimit })
+    }
     return json(404, { error: 'not_found', message: `Ruta no soportada: ${path}` })
   } catch (e: any) {
     return json(e.status || 500, { error: e.kind || 'proxy_error', message: e.message })

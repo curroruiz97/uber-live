@@ -239,8 +239,37 @@ Deno.serve(async (req) => {
     }
 
     if (path === '/credits') return json(200, await getCredits(creds))
-    if (path === '/send-sms') return json(200, await sendSms(creds, payload))
-    if (path === '/send-email') return json(200, await sendEmail(creds, payload))
+
+    // Envío con gating de plan: suscripción activa + consumo atómico de créditos.
+    if (path === '/send-sms' || path === '/send-email') {
+      const isEmail = path === '/send-email'
+      const recipients = Array.isArray(payload.destinatarios) ? payload.destinatarios.length : 0
+      const channel = isEmail ? 'email' : (Number(payload.tipocontrato) ? 'sms_contrato' : 'sms')
+
+      const { data: sub } = await adminClient.from('subscriptions').select('status').eq('org_id', orgId).maybeSingle()
+      if (!sub || !['active', 'trialing'].includes(sub.status)) {
+        return json(402, { error: 'subscription_inactive', message: 'La suscripción de tu empresa no está activa.' })
+      }
+      if (recipients > 0) {
+        const { data: okC } = await adminClient.rpc('consume_credits', { p_org: orgId, p_amount: recipients, p_channel: channel, p_ref: null })
+        if (okC === false) return json(402, { error: 'insufficient_credits', message: 'Créditos insuficientes para este envío.' })
+      }
+      let res: any
+      try {
+        res = isEmail ? await sendEmail(creds, payload) : await sendSms(creds, payload)
+      } catch (e) {
+        if (recipients > 0) await adminClient.rpc('grant_credits', { p_org: orgId, p_amount: recipients, p_bucket: 'included', p_reason: 'refund', p_channel: channel, p_ref: null })
+        throw e
+      }
+      // Reembolso de lo no entregado.
+      if (!res.ok && recipients > 0) {
+        await adminClient.rpc('grant_credits', { p_org: orgId, p_amount: recipients, p_bucket: 'included', p_reason: 'refund', p_channel: channel, p_ref: null })
+      } else if (res.noEnviados > 0) {
+        await adminClient.rpc('grant_credits', { p_org: orgId, p_amount: res.noEnviados, p_bucket: 'included', p_reason: 'refund', p_channel: channel, p_ref: null })
+      }
+      return json(200, res)
+    }
+
     if (path === '/report') return json(200, await getReport(creds, payload))
     return json(404, { error: 'not_found', message: `Ruta no soportada: ${path}` })
   } catch (e: any) {

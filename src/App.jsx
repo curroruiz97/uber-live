@@ -5,10 +5,12 @@ import { AuthProvider, useAuth } from './state/AuthContext'
 import { AppProvider, useApp } from './state/AppContext'
 import { OrgProvider, useOrg } from './state/OrgContext'
 import { BrandProvider } from './state/BrandContext'
+import { PlanProvider, usePlan } from './state/PlanContext'
 import { WhatsAppProvider } from './state/whatsapp'
 import { MensatekProvider } from './state/mensatek'
 import AuthScreens from './components/onboarding/AuthScreens'
 import CreateOrgWizard from './components/onboarding/CreateOrgWizard'
+import SubscriptionGate from './components/billing/SubscriptionGate'
 import ConnectScreen from './components/onboarding/ConnectScreen'
 import DashboardLayout from './components/layout/DashboardLayout'
 
@@ -34,13 +36,17 @@ function AuthGate() {
     <OrgProvider>
       <OrgGate>
         <BrandProvider>
-          <AppProvider>
-            <WhatsAppProvider>
-              <MensatekProvider>
-                <Root />
-              </MensatekProvider>
-            </WhatsAppProvider>
-          </AppProvider>
+          <PlanProvider>
+            <PlanGate>
+              <AppProvider>
+                <WhatsAppProvider>
+                  <MensatekProvider>
+                    <Root />
+                  </MensatekProvider>
+                </WhatsAppProvider>
+              </AppProvider>
+            </PlanGate>
+          </PlanProvider>
         </BrandProvider>
       </OrgGate>
     </OrgProvider>
@@ -59,6 +65,20 @@ function OrgGate({ children }) {
     )
   }
   if (!hasOrg) return <CreateOrgWizard />
+  return children
+}
+
+// Gate de suscripción: bloquea la app si el plan no está activo (past_due/canceled).
+function PlanGate({ children }) {
+  const { loading, isBlocked } = usePlan()
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-app">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      </div>
+    )
+  }
+  if (isBlocked) return <SubscriptionGate />
   return children
 }
 

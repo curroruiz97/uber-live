@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useFleet } from '../../state/useFleetData'
 import { useMensatek } from '../../state/mensatek'
+import { usePlan } from '../../state/PlanContext'
 import { buildMessage, smsIssuerReady, isValidEmail, toMensatekPhone } from '../../utils/mensatek'
 
 const CHANNEL_TABS = [
@@ -25,7 +26,8 @@ const BATCH = 50 // máximo de destinatarios por llamada a Mensatek
 
 export default function MensatekSendPanel() {
   const { riders } = useFleet()
-  const { config, templates, sendSms, sendEmail, logSent, credits } = useMensatek()
+  const { config, templates, sendSms, sendEmail, logSent } = useMensatek()
+  const plan = usePlan()
 
   const [channel, setChannel] = useState('sms')
   const [audience, setAudience] = useState('active')
@@ -56,9 +58,15 @@ export default function MensatekSendPanel() {
 
   const smsReady = smsIssuerReady(config)
   const emailSenderReady = isValidEmail(config.senderEmail)
-  const blocker = isEmail
+  const configBlocker = isEmail
     ? (!emailSenderReady && 'Configura un remitente de email validado en «Datos del emisor».')
     : (!smsReady && 'Completa Contacto, Teléfono y CIF del emisor en «Datos del emisor».')
+  const planBlocker = plan.isBlocked
+    ? 'La suscripción de tu empresa no está activa.'
+    : (eligible.length > plan.creditBalance
+        ? `Créditos del plan insuficientes: ${plan.creditBalance} disponibles para ${eligible.length} envíos.`
+        : null)
+  const blocker = configBlocker || planBlocker
 
   const canSend = eligible.length > 0 && !blocker && (isEmail ? subject.trim() && emailBody.trim() : smsText.trim())
 
@@ -213,7 +221,7 @@ export default function MensatekSendPanel() {
 
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-faint">
-            {credits != null && <>Créditos: <span className="font-medium tabular-nums text-muted">{credits.toLocaleString('es-ES')}</span></>}
+            Créditos del plan: <span className="font-medium tabular-nums text-muted">{plan.creditBalance.toLocaleString('es-ES')}</span>
           </p>
           <button
             onClick={() => setConfirmOpen(true)}

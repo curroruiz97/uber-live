@@ -23,7 +23,7 @@ export default function SettingsLayout() {
   const Comp = current.Comp
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="w-full">
       {/* Móvil: tabs horizontales */}
       <div className="mb-4 flex gap-1 overflow-x-auto pb-1 md:hidden">
         {SECTIONS.map((s) => (

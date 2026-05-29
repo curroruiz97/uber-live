@@ -117,7 +117,7 @@ export default function RidersTable() {
                 type="checkbox"
                 checked={pageAllSelected}
                 onChange={(e) => selectMany(pageRows.map((r) => r.id), e.target.checked)}
-                className="h-4 w-4 cursor-pointer accent-indigo-500"
+                className="h-4 w-4 cursor-pointer accent-orange-500"
                 aria-label="Seleccionar página"
               />
             </th>

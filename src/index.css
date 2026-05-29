@@ -14,7 +14,7 @@
   --c-fg: 24 24 27; /* texto principal */
   --c-muted: 82 82 91; /* texto secundario */
   --c-faint: 113 113 122; /* texto terciario */
-  --c-accent: 99 102 241; /* indigo-500 */
+  --c-accent: 249 115 22; /* orange-500 — naranja Sapiens */
   color-scheme: light;
 }
 
@@ -26,8 +26,28 @@
   --c-fg: 244 244 245;
   --c-muted: 161 161 170;
   --c-faint: 113 113 122;
-  --c-accent: 129 140 248; /* indigo-400, más vivo sobre fondo oscuro */
+  --c-accent: 251 146 60; /* orange-400, más vivo sobre fondo oscuro */
   color-scheme: dark;
+}
+
+/* ===========================================================================
+   Autofill de Chrome: por defecto pinta un fondo amarillo feo que rompe el
+   tema oscuro. Aquí forzamos el color de fondo del input y del texto a las
+   variables del tema. El truco del transition de 6e5 segundos evita el flash.
+   =========================================================================== */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--c-inset)) inset !important;
+  -webkit-text-fill-color: rgb(var(--c-fg)) !important;
+  caret-color: rgb(var(--c-fg));
+  transition:
+    background-color 600000s 0s,
+    color 600000s 0s;
+  border-color: rgb(var(--c-line)) !important;
 }
 
 html,

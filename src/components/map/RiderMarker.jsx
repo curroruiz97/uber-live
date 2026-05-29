@@ -63,7 +63,7 @@ export default function RiderMarker({ rider, selected, onSelect }) {
                   channel: 'wa.me',
                 })
               }
-              className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#25D366] px-2.5 py-1 text-xs font-semibold text-white no-underline"
+              className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[#25D366] px-2.5 py-1 text-xs font-semibold !text-white no-underline visited:!text-white hover:!text-white"
             >
               <WhatsAppIcon className="h-3.5 w-3.5" /> WhatsApp
             </a>

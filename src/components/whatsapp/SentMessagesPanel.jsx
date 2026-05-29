@@ -10,7 +10,7 @@ const STATUS_STYLE = {
   'enviado (demo)': 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   enviado: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   entregado: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  leído: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400',
+  leído: 'bg-accent/10 text-accent',
   error: 'bg-red-500/10 text-red-600 dark:text-red-400',
 }
 

@@ -60,7 +60,7 @@ export default function MiniRouteMap({ rider, pickup, dropoff }) {
           maxZoom={MAP_TILES.maxZoom}
         />
         {line.length === 2 && (
-          <Polyline positions={line} pathOptions={{ color: '#6366f1', weight: 3, opacity: 0.7, dashArray: '4 6' }} />
+          <Polyline positions={line} pathOptions={{ color: '#f97316', weight: 3, opacity: 0.7, dashArray: '4 6' }} />
         )}
         {hasCoords(pickup) && <Marker position={[pickup.lat, pickup.lng]} icon={dotIcon('#0ea5e9')} />}
         {hasCoords(dropoff) && <Marker position={[dropoff.lat, dropoff.lng]} icon={dotIcon('#f59e0b')} />}

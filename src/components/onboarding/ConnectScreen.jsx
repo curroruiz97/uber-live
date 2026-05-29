@@ -49,9 +49,9 @@ export default function ConnectScreen() {
       </div>
 
       <div className="relative w-full max-w-md animate-fade-in">
-        <div className="mb-8">
-          <Logo className="h-10 w-auto" />
-          <p className="mt-2 text-xs text-faint">Centro de control de flota · 3PL Delivery</p>
+        <div className="mb-10 flex flex-col items-center text-center">
+          <Logo className="h-[100px] w-auto" />
+          <p className="mt-4 text-sm text-muted">Centro de control de flota · 3PL Delivery</p>
         </div>
 
         <div className="rounded-2xl border border-line bg-panel p-6 shadow-soft">

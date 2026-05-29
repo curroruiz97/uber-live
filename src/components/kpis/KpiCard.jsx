@@ -6,7 +6,7 @@ const ACCENTS = {
   emerald: { chip: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10', hex: '#10b981' },
   sky: { chip: 'text-sky-600 dark:text-sky-400 bg-sky-500/10', hex: '#0ea5e9' },
   amber: { chip: 'text-amber-600 dark:text-amber-400 bg-amber-500/10', hex: '#f59e0b' },
-  indigo: { chip: 'text-indigo-600 dark:text-indigo-400 bg-indigo-500/10', hex: '#6366f1' },
+  indigo: { chip: 'text-orange-600 dark:text-orange-400 bg-orange-500/10', hex: '#f97316' },
   red: { chip: 'text-red-600 dark:text-red-400 bg-red-500/10', hex: '#ef4444' },
 }
 

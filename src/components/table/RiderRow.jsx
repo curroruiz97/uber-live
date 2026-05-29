@@ -41,7 +41,7 @@ export default function RiderRow({ rider, now, selected, onSelect }) {
           type="checkbox"
           checked={checked}
           onChange={() => toggleSelect(rider.id)}
-          className="h-4 w-4 cursor-pointer accent-indigo-500"
+          className="h-4 w-4 cursor-pointer accent-orange-500"
           aria-label={`Seleccionar ${rider.name}`}
         />
       </td>

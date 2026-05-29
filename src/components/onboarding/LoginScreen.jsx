@@ -30,30 +30,47 @@ export default function LoginScreen() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-app px-4 py-10">
+      {/* Halos de fondo con el naranja Sapiens */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-70"
+        className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(60% 50% at 50% 0%, rgb(var(--c-accent) / 0.16), transparent 70%), radial-gradient(40% 40% at 80% 100%, rgb(14 165 233 / 0.10), transparent 70%)',
+            'radial-gradient(55% 45% at 50% 0%, rgb(var(--c-accent) / 0.20), transparent 70%), radial-gradient(45% 45% at 85% 100%, rgb(var(--c-accent) / 0.12), transparent 72%)',
         }}
       />
+      {/* Patrón de puntos sutil para profundidad */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.08]"
+        style={{
+          backgroundImage:
+            'radial-gradient(rgb(var(--c-fg)) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      />
+
       <div className="absolute right-4 top-4 z-10">
         <ThemeToggle />
       </div>
 
-      <div className="relative w-full max-w-sm animate-fade-in">
-        <div className="mb-8">
-          <Logo className="h-10 w-auto" />
-          <p className="mt-2 text-xs text-faint">Centro de control de flota</p>
+      <div className="relative w-full max-w-md animate-fade-in">
+        {/* Logo + tagline centrados */}
+        <div className="mb-10 flex flex-col items-center text-center">
+          <Logo className="h-[100px] w-auto" />
+          <p className="mt-4 text-sm text-muted">Centro de control de flota</p>
         </div>
 
-        <div className="rounded-2xl border border-line bg-panel p-6 shadow-soft">
-          <h2 className="text-base font-semibold text-fg">Acceso del equipo</h2>
-          <p className="mt-1 text-sm text-muted">Inicia sesión con tu cuenta para continuar.</p>
+        {/* Card de acceso */}
+        <div className="rounded-2xl border border-line bg-panel/95 p-7 shadow-2xl shadow-black/10 ring-1 ring-accent/10 backdrop-blur sm:p-8">
+          <div className="mb-6 text-center">
+            <h2 className="text-lg font-semibold text-fg">Acceso del equipo</h2>
+            <p className="mt-1.5 text-sm text-muted">Inicia sesión con tu cuenta para continuar</p>
+          </div>
 
-          <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted">Email</label>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">
+                Email
+              </label>
               <input
                 type="email"
                 value={email}
@@ -61,12 +78,14 @@ export default function LoginScreen() {
                 placeholder="tu@empresa.com"
                 autoComplete="email"
                 required
-                className="w-full rounded-lg border border-line bg-inset px-3 py-2.5 text-sm text-fg placeholder-faint outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
+                className="w-full rounded-lg border border-line bg-inset px-3.5 py-3 text-sm text-fg placeholder-faint outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted">Contraseña</label>
+              <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-muted">
+                Contraseña
+              </label>
               <div className="relative">
                 <input
                   type={showPw ? 'text' : 'password'}
@@ -75,7 +94,7 @@ export default function LoginScreen() {
                   placeholder="••••••••"
                   autoComplete="current-password"
                   required
-                  className="w-full rounded-lg border border-line bg-inset py-2.5 pl-3 pr-10 text-sm text-fg placeholder-faint outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
+                  className="w-full rounded-lg border border-line bg-inset py-3 pl-3.5 pr-10 text-sm text-fg placeholder-faint outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
                 />
                 <button
                   type="button"
@@ -98,7 +117,7 @@ export default function LoginScreen() {
             <button
               type="submit"
               disabled={busy}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-sm font-semibold text-white shadow-lg shadow-accent/25 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition hover:shadow-accent/40 hover:brightness-110 active:brightness-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy ? (
                 <>
@@ -112,10 +131,14 @@ export default function LoginScreen() {
             </button>
           </form>
 
-          <p className="mt-4 text-center text-xs text-faint">
+          <p className="mt-6 text-center text-xs text-faint">
             ¿Sin cuenta? Pídele acceso al administrador del equipo.
           </p>
         </div>
+
+        <p className="mt-6 text-center text-[11px] text-faint">
+          © {new Date().getFullYear()} Sapiens Telco · Gestión de flota
+        </p>
       </div>
     </div>
   )

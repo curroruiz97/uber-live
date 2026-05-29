@@ -15,6 +15,7 @@ export const BRAND_DEFAULTS = {
   accentDark: '251 146 60',
   logoLightUrl: '',
   logoDarkUrl: '',
+  faviconUrl: '',
 }
 
 export function useBrand() {
@@ -55,6 +56,7 @@ export function BrandProvider({ children }) {
         accentDark: data?.accent_dark || BRAND_DEFAULTS.accentDark,
         logoLightUrl: data?.logo_light_url || '',
         logoDarkUrl: data?.logo_dark_url || '',
+        faviconUrl: data?.favicon_url || '',
       })
     })()
     return () => {
@@ -75,6 +77,23 @@ export function BrandProvider({ children }) {
       : 'Gestión de flota'
   }, [brand.companyName])
 
+  // Favicon por empresa (sobrescribe el del index.html).
+  useEffect(() => {
+    const id = 'brand-favicon'
+    let link = document.getElementById(id)
+    if (brand.faviconUrl) {
+      if (!link) {
+        link = document.createElement('link')
+        link.id = id
+        link.rel = 'icon'
+        document.head.appendChild(link)
+      }
+      link.href = brand.faviconUrl
+    } else if (link) {
+      link.remove()
+    }
+  }, [brand.faviconUrl])
+
   const save = useCallback(
     async (patch) => {
       if (!orgId) return { error: new Error('Sin organización') }
@@ -84,6 +103,7 @@ export function BrandProvider({ children }) {
       if ('accentDark' in patch) row.accent_dark = patch.accentDark
       if ('logoLightUrl' in patch) row.logo_light_url = patch.logoLightUrl
       if ('logoDarkUrl' in patch) row.logo_dark_url = patch.logoDarkUrl
+      if ('faviconUrl' in patch) row.favicon_url = patch.faviconUrl
       const { error } = await supabase.from('org_branding').update(row).eq('org_id', orgId)
       if (!error) setBrand((b) => ({ ...b, ...patch }))
       return { error }

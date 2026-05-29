@@ -36,6 +36,13 @@ export function AuthProvider({ children }) {
       loading,
       signIn: (email, password) =>
         supabase.auth.signInWithPassword({ email: email.trim(), password }),
+      signUp: (email, password) =>
+        supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        }),
+      resend: (email) => supabase.auth.resend({ type: 'signup', email: email.trim() }),
       signOut: () => supabase.auth.signOut(),
     }),
     [session, loading],

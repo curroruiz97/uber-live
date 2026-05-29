@@ -7,7 +7,8 @@ import { OrgProvider, useOrg } from './state/OrgContext'
 import { BrandProvider } from './state/BrandContext'
 import { WhatsAppProvider } from './state/whatsapp'
 import { MensatekProvider } from './state/mensatek'
-import LoginScreen from './components/onboarding/LoginScreen'
+import AuthScreens from './components/onboarding/AuthScreens'
+import CreateOrgWizard from './components/onboarding/CreateOrgWizard'
 import ConnectScreen from './components/onboarding/ConnectScreen'
 import DashboardLayout from './components/layout/DashboardLayout'
 
@@ -27,7 +28,7 @@ function AuthGate() {
       </div>
     )
   }
-  if (!session) return <LoginScreen />
+  if (!session) return <AuthScreens />
 
   return (
     <OrgProvider>
@@ -46,8 +47,8 @@ function AuthGate() {
   )
 }
 
-// Gate de organización: espera a cargar las orgs del usuario y exige tener al menos
-// una. (El alta autoservicio / asistente de creación llega en una fase posterior.)
+// Gate de organización: espera a cargar las orgs del usuario. Si no tiene ninguna,
+// muestra el asistente de creación de empresa (alta autoservicio).
 function OrgGate({ children }) {
   const { loading, hasOrg } = useOrg()
   if (loading) {
@@ -57,18 +58,7 @@ function OrgGate({ children }) {
       </div>
     )
   }
-  if (!hasOrg) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-app px-4">
-        <div className="max-w-sm rounded-2xl border border-line bg-panel p-6 text-center shadow-soft">
-          <h2 className="text-base font-semibold text-fg">Sin organización</h2>
-          <p className="mt-2 text-sm text-muted">
-            Tu cuenta todavía no pertenece a ninguna empresa. Pide a un administrador que te invite.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  if (!hasOrg) return <CreateOrgWizard />
   return children
 }
 

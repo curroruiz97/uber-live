@@ -7,6 +7,7 @@ import { useFleet } from '../../state/useFleetData'
 import { ENVIRONMENTS } from '../../config/constants'
 import LiveIndicator from '../common/LiveIndicator'
 import ThemeToggle from '../common/ThemeToggle'
+import OrgSwitcher from './OrgSwitcher'
 
 const TITLES = {
   dashboard: 'Dashboard',
@@ -62,6 +63,8 @@ export default function Topbar({ onToggleMobile, onOpenPalette }) {
             {env?.label ?? 'Sandbox'}
           </span>
         )}
+        <span className="hidden h-4 w-px bg-line lg:block" />
+        <OrgSwitcher />
       </div>
 
       {/* Disparador del command palette (oculto en móvil) */}

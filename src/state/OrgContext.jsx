@@ -30,6 +30,12 @@ export function OrgProvider({ children }) {
 
   const reload = useCallback(async () => {
     setLoading(true)
+    // Acepta automáticamente invitaciones pendientes para el email del usuario.
+    try {
+      await supabase.rpc('accept_pending_invitations')
+    } catch {
+      /* ignore */
+    }
     const { data } = await supabase
       .from('org_members')
       .select('role, created_at, organizations(id, name, slug, is_platform_admin)')

@@ -1,25 +1,21 @@
-// Edge Function (Deno): proxy de Uber Vehicle Solutions.
-// Sustituye al backend Express en producción (todo serverless: Vercel + Supabase).
-// Guarda el client_secret en los secrets de la función (UBER_CLIENT_SECRET, etc.),
-// hace OAuth (client_credentials), cachea el token y fusiona orgs -> drivers/actions
-// (estado) + analytics (métricas hoy) en { orgs, riders[], metrics }.
-//
-// Seguridad: exige un USUARIO real de Supabase (getUser); la anon key sola no basta.
+// Edge Function (Deno): proxy de Uber Vehicle Solutions — MULTI-TENANT.
+// Resuelve la organización del llamante (header x-org-id, validado contra org_members)
+// y carga sus credenciales de Uber desde org_integrations/org_secrets (service_role),
+// con fallback a los secrets de entorno (para la org Sapiens durante la transición).
+// El client_secret nunca llega al navegador. Cachea el token OAuth por org+entorno+scope.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-uber-token',
+    'authorization, x-client-info, apikey, content-type, x-uber-token, x-org-id',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 const json = (status: number, obj: unknown) =>
-  new Response(JSON.stringify(obj), {
-    status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
+  new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 
-const cfg = {
+// Config GLOBAL (endpoints + fallback de credenciales por entorno).
+const envCfg = {
   clientId: Deno.env.get('UBER_CLIENT_ID') ?? '',
   clientSecret: Deno.env.get('UBER_CLIENT_SECRET') ?? '',
   scope: Deno.env.get('UBER_SCOPE') ?? '',
@@ -34,22 +30,23 @@ const cfg = {
 }
 
 type EnvName = 'sandbox' | 'production'
+type Creds = { clientId: string; clientSecret: string; scope: string }
 const tokenCache = new Map<string, { token: string; expiresAt: number }>()
 
-async function mintToken(envName: EnvName, scopeOverride?: string | null, force?: boolean) {
-  const scope = scopeOverride != null ? scopeOverride : cfg.scope
-  const cacheKey = `${envName}:${scope}`
+async function mintToken(orgId: string, creds: Creds, envName: EnvName, scopeOverride?: string | null, force?: boolean) {
+  const scope = scopeOverride != null ? scopeOverride : creds.scope
+  const cacheKey = `${orgId}:${envName}:${scope}`
   if (!force) {
     const cached = tokenCache.get(cacheKey)
     if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token
   }
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
-    client_id: cfg.clientId,
-    client_secret: cfg.clientSecret,
+    client_id: creds.clientId,
+    client_secret: creds.clientSecret,
   })
   if (scope) body.set('scope', scope)
-  const res = await fetch(cfg.tokenUrl[envName] || cfg.tokenUrl.sandbox, {
+  const res = await fetch(envCfg.tokenUrl[envName] || envCfg.tokenUrl.sandbox, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body,
@@ -142,9 +139,9 @@ async function fetchAnalytics(base: string, token: string, orgId: string) {
   return map
 }
 
-async function ping(envName: EnvName, pastedToken?: string, scopeOverride?: string | null) {
-  const base = cfg.base[envName] || cfg.base.sandbox
-  const token = pastedToken || (await mintToken(envName, scopeOverride))
+async function ping(orgId: string, creds: Creds, envName: EnvName, pastedToken?: string, scopeOverride?: string | null) {
+  const base = envCfg.base[envName] || envCfg.base.sandbox
+  const token = pastedToken || (await mintToken(orgId, creds, envName, scopeOverride))
   const orgsRes = await rawCall(base, '/v1/vehicle-suppliers/orgs', 'GET', token)
   if (orgsRes.status !== 200) {
     const err: any = new Error(orgsRes.json?.message || `Uber orgs respondió ${orgsRes.status}`)
@@ -155,9 +152,9 @@ async function ping(envName: EnvName, pastedToken?: string, scopeOverride?: stri
   return { ok: true, orgs: (orgsRes.json.organizations || []).length }
 }
 
-async function fetchFleet(envName: EnvName, pastedToken?: string, scopeOverride?: string | null) {
-  const base = cfg.base[envName] || cfg.base.sandbox
-  const token = pastedToken || (await mintToken(envName, scopeOverride))
+async function fetchFleet(orgId: string, creds: Creds, envName: EnvName, pastedToken?: string, scopeOverride?: string | null) {
+  const base = envCfg.base[envName] || envCfg.base.sandbox
+  const token = pastedToken || (await mintToken(orgId, creds, envName, scopeOverride))
 
   const orgsRes = await rawCall(base, '/v1/vehicle-suppliers/orgs', 'GET', token)
   if (orgsRes.status !== 200) {
@@ -219,41 +216,83 @@ async function fetchFleet(envName: EnvName, pastedToken?: string, scopeOverride?
   }
 }
 
+// Resuelve la org del llamante y carga sus credenciales (con fallback a env).
+async function resolveOrgCreds(userClient: any, adminClient: any, requestedOrgId: string) {
+  // org del usuario: si llega x-org-id, validar pertenencia; si no, su primera org.
+  let orgId = requestedOrgId
+  if (orgId) {
+    const { data } = await userClient.from('org_members').select('org_id').eq('org_id', orgId).maybeSingle()
+    if (!data) {
+      const err: any = new Error('No perteneces a esta organización.')
+      err.status = 403
+      err.kind = 'forbidden'
+      throw err
+    }
+  } else {
+    const { data } = await userClient.from('org_members').select('org_id').order('created_at', { ascending: true }).limit(1).maybeSingle()
+    orgId = data?.org_id || ''
+  }
+
+  let integ: any = null
+  let secrets: any = null
+  if (orgId) {
+    const [{ data: i }, { data: s }] = await Promise.all([
+      adminClient.from('org_integrations').select('*').eq('org_id', orgId).maybeSingle(),
+      adminClient.from('org_secrets').select('*').eq('org_id', orgId).maybeSingle(),
+    ])
+    integ = i
+    secrets = s
+  }
+  const creds: Creds = {
+    clientId: integ?.uber_client_id || envCfg.clientId,
+    clientSecret: secrets?.uber_client_secret || envCfg.clientSecret,
+    scope: integ?.uber_scope || envCfg.scope,
+  }
+  return { orgId, creds, integ }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
-  // Exigir usuario real de Supabase (no solo la anon key, que es pública).
-  const supabase = createClient(
+  const userClient = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!,
     { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } },
   )
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await userClient.auth.getUser()
   if (!user) return json(401, { error: 'unauthorized', message: 'Sesión no válida.' })
 
-  if (!cfg.clientId || !cfg.clientSecret) {
-    return json(503, { error: 'not_configured', message: 'Faltan UBER_CLIENT_ID / UBER_CLIENT_SECRET en los secrets de la función.' })
-  }
+  const adminClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  )
 
   const url = new URL(req.url)
   const path = url.pathname.replace(/^\/uber/, '') || '/'
   const envName: EnvName = url.searchParams.get('env') === 'production' ? 'production' : 'sandbox'
   const pastedToken = req.headers.get('x-uber-token') || ''
   const scopeOverride = url.searchParams.has('scope') ? url.searchParams.get('scope') : undefined
+  const requestedOrgId = req.headers.get('x-org-id') || url.searchParams.get('org_id') || ''
 
   try {
+    const { orgId, creds } = await resolveOrgCreds(userClient, adminClient, requestedOrgId)
+
     if (path === '/health' || path === '/') {
       return json(200, {
-        configured: Boolean(cfg.clientId && cfg.clientSecret),
-        hasClientId: Boolean(cfg.clientId),
-        hasSecret: Boolean(cfg.clientSecret),
-        scopeSet: Boolean(cfg.scope),
-        tokenUrl: cfg.tokenUrl,
-        base: cfg.base,
+        orgId,
+        configured: Boolean(creds.clientId && creds.clientSecret),
+        hasClientId: Boolean(creds.clientId),
+        hasSecret: Boolean(creds.clientSecret),
+        scopeSet: Boolean(creds.scope),
       })
     }
-    if (path === '/ping') return json(200, await ping(envName, pastedToken, scopeOverride))
-    if (path === '/fleet') return json(200, await fetchFleet(envName, pastedToken, scopeOverride))
+
+    if (!creds.clientId || !creds.clientSecret) {
+      return json(503, { error: 'not_configured', message: 'Esta organización no tiene configuradas las credenciales de Uber.' })
+    }
+
+    if (path === '/ping') return json(200, await ping(orgId, creds, envName, pastedToken, scopeOverride))
+    if (path === '/fleet') return json(200, await fetchFleet(orgId, creds, envName, pastedToken, scopeOverride))
     return json(404, { error: 'not_found', message: `Ruta no soportada: ${path}` })
   } catch (e: any) {
     return json(e.status || 500, { error: e.kind || 'proxy_error', message: e.message })

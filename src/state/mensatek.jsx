@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+import { useOrg } from './OrgContext'
 import { mensatekApi } from '../api/mensatekClient'
 import { CHANNELS, toMensatekPhone } from '../utils/mensatek'
 
@@ -49,6 +50,7 @@ function rowToLog(r) {
 // con debounce; el log de envíos se sincroniza en vivo entre el equipo.
 export function MensatekProvider({ children }) {
   const { user } = useAuth()
+  const { currentOrgId: orgId } = useOrg()
 
   const [config, setConfigState] = useState(DEFAULTS)
   const [templates, setTemplates] = useState([])
@@ -57,43 +59,44 @@ export function MensatekProvider({ children }) {
   const [conn, setConn] = useState({ status: 'idle', checkedAt: null, message: '' })
   const writeTimers = useRef({})
 
-  // Carga inicial desde Postgres.
+  // Carga inicial desde Postgres, filtrada por la organización activa.
   useEffect(() => {
+    if (!orgId) return undefined
     let alive = true
     ;(async () => {
       const [tpls, st, log] = await Promise.all([
-        supabase.from('mensatek_templates').select('*').order('created_at', { ascending: true }),
-        supabase.from('app_settings').select('*').eq('id', 1).maybeSingle(),
-        supabase.from('mensatek_sent_log').select('*').order('ts', { ascending: false }).limit(LOG_CAP),
+        supabase.from('mensatek_templates').select('*').eq('org_id', orgId).order('created_at', { ascending: true }),
+        supabase.from('org_settings').select('*').eq('org_id', orgId).maybeSingle(),
+        supabase.from('mensatek_sent_log').select('*').eq('org_id', orgId).order('ts', { ascending: false }).limit(LOG_CAP),
       ])
       if (!alive) return
-      if (tpls.data) setTemplates(tpls.data.map(rowToTemplate))
-      if (st.data) {
-        setConfigState({
-          contacto: st.data.mensatek_contacto ?? DEFAULTS.contacto,
-          telcontacto: st.data.mensatek_telcontacto ?? DEFAULTS.telcontacto,
-          cifcontacto: st.data.mensatek_cifcontacto ?? DEFAULTS.cifcontacto,
-          senderSms: st.data.mensatek_sender_sms ?? DEFAULTS.senderSms,
-          senderEmail: st.data.mensatek_sender_email ?? DEFAULTS.senderEmail,
-          smsText: st.data.mensatek_sms_text ?? DEFAULTS.smsText,
-          emailSubject: st.data.mensatek_email_subject ?? DEFAULTS.emailSubject,
-          emailBody: st.data.mensatek_email_body ?? DEFAULTS.emailBody,
-        })
-      }
-      if (log.data) setSentLog(log.data.map(rowToLog))
+      setTemplates(tpls.data ? tpls.data.map(rowToTemplate) : [])
+      const d = st.data || {}
+      setConfigState({
+        contacto: d.mensatek_contacto ?? DEFAULTS.contacto,
+        telcontacto: d.mensatek_telcontacto ?? DEFAULTS.telcontacto,
+        cifcontacto: d.mensatek_cifcontacto ?? DEFAULTS.cifcontacto,
+        senderSms: d.mensatek_sender_sms ?? DEFAULTS.senderSms,
+        senderEmail: d.mensatek_sender_email ?? DEFAULTS.senderEmail,
+        smsText: d.mensatek_sms_text ?? DEFAULTS.smsText,
+        emailSubject: d.mensatek_email_subject ?? DEFAULTS.emailSubject,
+        emailBody: d.mensatek_email_body ?? DEFAULTS.emailBody,
+      })
+      setSentLog(log.data ? log.data.map(rowToLog) : [])
     })()
     return () => {
       alive = false
     }
-  }, [])
+  }, [orgId])
 
-  // Realtime: el log de envíos se actualiza en vivo para todo el equipo.
+  // Realtime: el log de envíos se actualiza en vivo, filtrado por organización.
   useEffect(() => {
+    if (!orgId) return undefined
     const ch = supabase
-      .channel('mensatek_sent_log_rt')
+      .channel(`mensatek_sent_log_rt_${orgId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mensatek_sent_log' },
+        { event: 'INSERT', schema: 'public', table: 'mensatek_sent_log', filter: `org_id=eq.${orgId}` },
         (payload) => {
           const row = rowToLog(payload.new)
           setSentLog((prev) =>
@@ -105,21 +108,22 @@ export function MensatekProvider({ children }) {
     return () => {
       supabase.removeChannel(ch)
     }
-  }, [])
+  }, [orgId])
 
   const persistConfig = useCallback((patch) => {
+    if (!orgId) return
     clearTimeout(writeTimers.current.cfg)
     writeTimers.current.cfg = setTimeout(() => {
       supabase
-        .from('app_settings')
+        .from('org_settings')
         .update({ ...patch, updated_at: new Date().toISOString() })
-        .eq('id', 1)
+        .eq('org_id', orgId)
         .then(({ error }) => {
           // eslint-disable-next-line no-console
           if (error) console.error('[mensatek] config:', error.message)
         })
     }, 500)
-  }, [])
+  }, [orgId])
 
   const setConfig = useCallback(
     (patch) => {
@@ -144,6 +148,7 @@ export function MensatekProvider({ children }) {
   const addTemplate = useCallback(
     async (tpl) => {
       const row = {
+        org_id: orgId,
         channel: tpl.channel || 'sms',
         title: tpl.title || 'Sin título',
         subject: tpl.subject || '',
@@ -153,7 +158,7 @@ export function MensatekProvider({ children }) {
       const { data, error } = await supabase.from('mensatek_templates').insert(row).select().single()
       if (!error && data) setTemplates((prev) => [...prev, rowToTemplate(data)])
     },
-    [user],
+    [user, orgId],
   )
 
   const updateTemplate = useCallback((id, patch) => {
@@ -181,6 +186,7 @@ export function MensatekProvider({ children }) {
     async (entries) => {
       const arr = Array.isArray(entries) ? entries : [entries]
       const rows = arr.map((e) => ({
+        org_id: orgId,
         rider_id: e.riderId ?? null,
         rider_name: e.riderName ?? '',
         channel: e.channel ?? 'sms',
@@ -206,7 +212,7 @@ export function MensatekProvider({ children }) {
         return [...fresh, ...prev].slice(0, LOG_CAP)
       })
     },
-    [user],
+    [user, orgId],
   )
 
   // Comprueba la conexión leyendo los créditos (verifica credenciales del proxy).

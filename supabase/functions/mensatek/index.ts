@@ -1,53 +1,43 @@
-// Edge Function (Deno): proxy de Mensatek (API v7 unificada).
-// Envío de SMS Certificado, SMS Contrato y Email Certificado a los riders.
-// Mantiene el API Token de Mensatek en los secrets de la función (nunca en el
-// navegador) y añade la Autenticación Básica (UsuarioAPI:APIToken) server-side.
-//
-// Doc oficial: https://api.mensatek.com/v7/  (Basic Auth, POST, Resp=JSON)
-//   - POST /EnviarSMSCERTIFICADO   (SMS Certificado / SMS Contrato vía Tipocontrato)
-//   - POST /EnviarEMAILCERTIFICADO (Email Certificado)
-//   - POST /GetCreditos            (créditos restantes)
-//   - POST /GetReportSMSCERTIFICADO | /GetReportEMAILCERTIFICADO
-//
-// Seguridad: exige un USUARIO real de Supabase (getUser); la anon key sola no basta.
+// Edge Function (Deno): proxy de Mensatek (API v7) — MULTI-TENANT.
+// Resuelve la organización del llamante (header x-org-id, validado contra org_members)
+// y carga sus credenciales de Mensatek desde org_integrations/org_secrets (service_role),
+// con fallback a los secrets de entorno (org Sapiens durante la transición).
+// El API Token nunca llega al navegador. POST form-urlencoded con Basic Auth.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-org-id',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 const json = (status: number, obj: unknown) =>
-  new Response(JSON.stringify(obj), {
-    status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
+  new Response(JSON.stringify(obj), { status, headers: { ...CORS, 'Content-Type': 'application/json' } })
 
-const cfg = {
+const envCfg = {
   apiUser: Deno.env.get('MENSATEK_API_USER') ?? '',
   apiToken: Deno.env.get('MENSATEK_API_TOKEN') ?? '',
   base: Deno.env.get('MENSATEK_BASE') ?? 'https://api.mensatek.com/v7',
 }
 
-function basicAuth() {
-  return 'Basic ' + btoa(`${cfg.apiUser}:${cfg.apiToken}`)
+type Creds = { apiUser: string; apiToken: string; base: string }
+
+function basicAuth(creds: Creds) {
+  return 'Basic ' + btoa(`${creds.apiUser}:${creds.apiToken}`)
 }
 
-// Mensatek responde un array JSON [{...}] en las funciones; normalizamos al objeto.
 function firstOf(data: any) {
   if (Array.isArray(data)) return data[0] ?? {}
   return data ?? {}
 }
 
-// POST form-urlencoded a Mensatek con Basic Auth. Devuelve el objeto normalizado.
-async function call(fn: string, fields: Record<string, string>) {
+async function call(creds: Creds, fn: string, fields: Record<string, string>) {
   const body = new URLSearchParams({ ...fields, Resp: 'JSON' })
   let r: Response
   try {
-    r = await fetch(`${cfg.base}/${fn}`, {
+    r = await fetch(`${creds.base}/${fn}`, {
       method: 'POST',
       headers: {
-        Authorization: basicAuth(),
+        Authorization: basicAuth(creds),
         'Content-Type': 'application/x-www-form-urlencoded',
         Accept: 'application/json',
       },
@@ -81,16 +71,12 @@ async function call(fn: string, fields: Record<string, string>) {
   return firstOf(data)
 }
 
-// --- Acciones expuestas al frontend -----------------------------------------
-
-async function getCredits() {
-  const res = await call('GetCreditos', {})
+async function getCredits(creds: Creds) {
+  const res = await call(creds, 'GetCreditos', {})
   return { ok: Number(res.Res) >= 0 || res.Cred != null, cred: Number(res.Cred) || 0, raw: res }
 }
 
-// Envío de SMS Certificado / SMS Contrato.
-// destinatarios: [{ movil, variable_1?, ... }]  (movil = dígitos con prefijo, ej 34600...)
-async function sendSms(p: any) {
+async function sendSms(creds: Creds, p: any) {
   const destinatarios = (p.destinatarios || []).map((d: any) => {
     const o: Record<string, string> = { Movil: String(d.movil || d.Movil || '') }
     for (let i = 1; i <= 10; i += 1) {
@@ -111,13 +97,11 @@ async function sendSms(p: any) {
   }
   if (p.fecha) fields.Fecha = String(p.fecha)
   if (p.referencia) fields.Referenciausuario = String(p.referencia)
-  const res = await call('EnviarSMSCERTIFICADO', fields)
+  const res = await call(creds, 'EnviarSMSCERTIFICADO', fields)
   return shapeSend(res)
 }
 
-// Envío de Email Certificado.
-// destinatarios: [{ nombre, email, variable_1? }]
-async function sendEmail(p: any) {
+async function sendEmail(creds: Creds, p: any) {
   const destinatarios = (p.destinatarios || []).map((d: any) => {
     const o: Record<string, string> = {
       Nombre: String(d.nombre || d.Nombre || ''),
@@ -141,11 +125,10 @@ async function sendEmail(p: any) {
     fields.Aceptacion = 'SI'
     fields.Caducidadaceptacion = String(p.caducidad ?? 10)
   }
-  const res = await call('EnviarEMAILCERTIFICADO', fields)
+  const res = await call(creds, 'EnviarEMAILCERTIFICADO', fields)
   return shapeSend(res)
 }
 
-// Normaliza la respuesta de envío a una forma común para el frontend.
 function shapeSend(res: any) {
   const r = Number(res.Res)
   const ok = r > 0
@@ -172,43 +155,63 @@ function shapeSend(res: any) {
   }
 }
 
-async function getReport(p: any) {
+async function getReport(creds: Creds, p: any) {
   const fn = p.channel === 'email' ? 'GetReportEMAILCERTIFICADO' : 'GetReportSMSCERTIFICADO'
-  const res = await call(fn, { Idmensaje: String(p.idMensaje ?? '') })
-  return res
+  return await call(creds, fn, { Idmensaje: String(p.idMensaje ?? '') })
+}
+
+// Resuelve la org del llamante y carga sus credenciales (con fallback a env).
+async function resolveOrgCreds(userClient: any, adminClient: any, requestedOrgId: string) {
+  let orgId = requestedOrgId
+  if (orgId) {
+    const { data } = await userClient.from('org_members').select('org_id').eq('org_id', orgId).maybeSingle()
+    if (!data) {
+      const err: any = new Error('No perteneces a esta organización.')
+      err.status = 403
+      err.kind = 'forbidden'
+      throw err
+    }
+  } else {
+    const { data } = await userClient.from('org_members').select('org_id').order('created_at', { ascending: true }).limit(1).maybeSingle()
+    orgId = data?.org_id || ''
+  }
+  let integ: any = null
+  let secrets: any = null
+  if (orgId) {
+    const [{ data: i }, { data: s }] = await Promise.all([
+      adminClient.from('org_integrations').select('mensatek_api_user').eq('org_id', orgId).maybeSingle(),
+      adminClient.from('org_secrets').select('mensatek_api_token').eq('org_id', orgId).maybeSingle(),
+    ])
+    integ = i
+    secrets = s
+  }
+  const creds: Creds = {
+    apiUser: integ?.mensatek_api_user || envCfg.apiUser,
+    apiToken: secrets?.mensatek_api_token || envCfg.apiToken,
+    base: envCfg.base,
+  }
+  return { orgId, creds }
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
-  // Exigir usuario real de Supabase (no solo la anon key, que es pública).
-  const supabase = createClient(
+  const userClient = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!,
     { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } },
   )
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await userClient.auth.getUser()
   if (!user) return json(401, { error: 'unauthorized', message: 'Sesión no válida.' })
+
+  const adminClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  )
 
   const url = new URL(req.url)
   const path = url.pathname.replace(/^\/mensatek/, '') || '/'
-
-  // /health no necesita credenciales: informa si la función está configurada.
-  if (path === '/health' || path === '/') {
-    return json(200, {
-      configured: Boolean(cfg.apiUser && cfg.apiToken),
-      hasUser: Boolean(cfg.apiUser),
-      hasToken: Boolean(cfg.apiToken),
-      base: cfg.base,
-    })
-  }
-
-  if (!cfg.apiUser || !cfg.apiToken) {
-    return json(503, {
-      error: 'not_configured',
-      message: 'Faltan MENSATEK_API_USER / MENSATEK_API_TOKEN en los secrets de la función.',
-    })
-  }
+  const requestedOrgId = req.headers.get('x-org-id') || ''
 
   let payload: any = {}
   if (req.method === 'POST') {
@@ -220,10 +223,25 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (path === '/credits') return json(200, await getCredits())
-    if (path === '/send-sms') return json(200, await sendSms(payload))
-    if (path === '/send-email') return json(200, await sendEmail(payload))
-    if (path === '/report') return json(200, await getReport(payload))
+    const { orgId, creds } = await resolveOrgCreds(userClient, adminClient, requestedOrgId || payload?.org_id || '')
+
+    if (path === '/health' || path === '/') {
+      return json(200, {
+        orgId,
+        configured: Boolean(creds.apiUser && creds.apiToken),
+        hasUser: Boolean(creds.apiUser),
+        hasToken: Boolean(creds.apiToken),
+      })
+    }
+
+    if (!creds.apiUser || !creds.apiToken) {
+      return json(503, { error: 'not_configured', message: 'Esta organización no tiene configuradas las credenciales de Mensatek.' })
+    }
+
+    if (path === '/credits') return json(200, await getCredits(creds))
+    if (path === '/send-sms') return json(200, await sendSms(creds, payload))
+    if (path === '/send-email') return json(200, await sendEmail(creds, payload))
+    if (path === '/report') return json(200, await getReport(creds, payload))
     return json(404, { error: 'not_found', message: `Ruta no soportada: ${path}` })
   } catch (e: any) {
     return json(e.status || 500, { error: e.kind || 'proxy_error', message: e.message })

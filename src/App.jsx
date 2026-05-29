@@ -3,6 +3,7 @@ import { ThemeProvider } from './state/ThemeContext'
 import { ToastProvider } from './state/toast'
 import { AuthProvider, useAuth } from './state/AuthContext'
 import { AppProvider, useApp } from './state/AppContext'
+import { OrgProvider, useOrg } from './state/OrgContext'
 import { WhatsAppProvider } from './state/whatsapp'
 import { MensatekProvider } from './state/mensatek'
 import LoginScreen from './components/onboarding/LoginScreen'
@@ -28,14 +29,44 @@ function AuthGate() {
   if (!session) return <LoginScreen />
 
   return (
-    <AppProvider>
-      <WhatsAppProvider>
-        <MensatekProvider>
-          <Root />
-        </MensatekProvider>
-      </WhatsAppProvider>
-    </AppProvider>
+    <OrgProvider>
+      <OrgGate>
+        <AppProvider>
+          <WhatsAppProvider>
+            <MensatekProvider>
+              <Root />
+            </MensatekProvider>
+          </WhatsAppProvider>
+        </AppProvider>
+      </OrgGate>
+    </OrgProvider>
   )
+}
+
+// Gate de organización: espera a cargar las orgs del usuario y exige tener al menos
+// una. (El alta autoservicio / asistente de creación llega en una fase posterior.)
+function OrgGate({ children }) {
+  const { loading, hasOrg } = useOrg()
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-app">
+        <Loader2 className="h-6 w-6 animate-spin text-accent" />
+      </div>
+    )
+  }
+  if (!hasOrg) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-app px-4">
+        <div className="max-w-sm rounded-2xl border border-line bg-panel p-6 text-center shadow-soft">
+          <h2 className="text-base font-semibold text-fg">Sin organización</h2>
+          <p className="mt-2 text-sm text-muted">
+            Tu cuenta todavía no pertenece a ninguna empresa. Pide a un administrador que te invite.
+          </p>
+        </div>
+      </div>
+    )
+  }
+  return children
 }
 
 export default function App() {

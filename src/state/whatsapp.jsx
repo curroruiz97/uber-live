@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
+import { useOrg } from './OrgContext'
 
 const WhatsAppContext = createContext(null)
 
@@ -34,6 +35,7 @@ function rowToLog(r) {
 // query por pulsación; el log de envíos se sincroniza en vivo entre el equipo.
 export function WhatsAppProvider({ children }) {
   const { user } = useAuth()
+  const { currentOrgId: orgId } = useOrg()
 
   const [contactMessage, setContactMessageState] = useState(DEFAULT_CONTACT)
   const [metaConfig, setMetaConfigState] = useState({ phoneNumberId: '', businessAccountId: '' })
@@ -43,38 +45,38 @@ export function WhatsAppProvider({ children }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const writeTimers = useRef({})
 
-  // Carga inicial desde Postgres (el provider solo monta con sesión activa).
+  // Carga inicial desde Postgres, filtrada por la organización activa.
   useEffect(() => {
+    if (!orgId) return undefined
     let alive = true
     ;(async () => {
       const [tpls, st, log] = await Promise.all([
-        supabase.from('wa_templates').select('*').order('created_at', { ascending: true }),
-        supabase.from('app_settings').select('*').eq('id', 1).maybeSingle(),
-        supabase.from('wa_sent_log').select('*').order('ts', { ascending: false }).limit(LOG_CAP),
+        supabase.from('wa_templates').select('*').eq('org_id', orgId).order('created_at', { ascending: true }),
+        supabase.from('org_settings').select('*').eq('org_id', orgId).maybeSingle(),
+        supabase.from('wa_sent_log').select('*').eq('org_id', orgId).order('ts', { ascending: false }).limit(LOG_CAP),
       ])
       if (!alive) return
-      if (tpls.data) setQuickTemplates(tpls.data.map(rowToTemplate))
-      if (st.data) {
-        setContactMessageState(st.data.contact_message ?? DEFAULT_CONTACT)
-        setMetaConfigState({
-          phoneNumberId: st.data.meta_phone_number_id ?? '',
-          businessAccountId: st.data.meta_business_account_id ?? '',
-        })
-      }
-      if (log.data) setSentLog(log.data.map(rowToLog))
+      setQuickTemplates(tpls.data ? tpls.data.map(rowToTemplate) : [])
+      setContactMessageState(st.data?.contact_message ?? DEFAULT_CONTACT)
+      setMetaConfigState({
+        phoneNumberId: st.data?.meta_phone_number_id ?? '',
+        businessAccountId: st.data?.meta_business_account_id ?? '',
+      })
+      setSentLog(log.data ? log.data.map(rowToLog) : [])
     })()
     return () => {
       alive = false
     }
-  }, [])
+  }, [orgId])
 
-  // Realtime: el log de envíos se actualiza en vivo para todo el equipo.
+  // Realtime: el log de envíos se actualiza en vivo, filtrado por organización.
   useEffect(() => {
+    if (!orgId) return undefined
     const ch = supabase
-      .channel('wa_sent_log_rt')
+      .channel(`wa_sent_log_rt_${orgId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'wa_sent_log' },
+        { event: 'INSERT', schema: 'public', table: 'wa_sent_log', filter: `org_id=eq.${orgId}` },
         (payload) => {
           const row = rowToLog(payload.new)
           setSentLog((prev) =>
@@ -86,21 +88,22 @@ export function WhatsAppProvider({ children }) {
     return () => {
       supabase.removeChannel(ch)
     }
-  }, [])
+  }, [orgId])
 
   const persistSettings = useCallback((patch) => {
+    if (!orgId) return
     clearTimeout(writeTimers.current.settings)
     writeTimers.current.settings = setTimeout(() => {
       supabase
-        .from('app_settings')
+        .from('org_settings')
         .update({ ...patch, updated_at: new Date().toISOString() })
-        .eq('id', 1)
+        .eq('org_id', orgId)
         .then(({ error }) => {
           // eslint-disable-next-line no-console
           if (error) console.error('[wa] settings:', error.message)
         })
     }, 500)
-  }, [])
+  }, [orgId])
 
   const setContactMessage = useCallback(
     (msg) => {
@@ -126,11 +129,11 @@ export function WhatsAppProvider({ children }) {
 
   const addTemplate = useCallback(
     async (tpl) => {
-      const row = { title: tpl.title || 'Sin título', text: tpl.text || '', created_by: user?.id ?? null }
+      const row = { org_id: orgId, title: tpl.title || 'Sin título', text: tpl.text || '', created_by: user?.id ?? null }
       const { data, error } = await supabase.from('wa_templates').insert(row).select().single()
       if (!error && data) setQuickTemplates((prev) => [...prev, rowToTemplate(data)])
     },
-    [user],
+    [user, orgId],
   )
 
   const updateTemplate = useCallback((id, patch) => {
@@ -177,6 +180,7 @@ export function WhatsAppProvider({ children }) {
     async (entries) => {
       const arr = Array.isArray(entries) ? entries : [entries]
       const rows = arr.map((e) => ({
+        org_id: orgId,
         rider_id: e.riderId ?? null,
         rider_name: e.riderName ?? '',
         phone: e.phone ?? '',
@@ -198,7 +202,7 @@ export function WhatsAppProvider({ children }) {
         return [...fresh, ...prev].slice(0, LOG_CAP)
       })
     },
-    [user],
+    [user, orgId],
   )
 
   const messagesToday = useMemo(() => {

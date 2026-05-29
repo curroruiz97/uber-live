@@ -5,6 +5,7 @@ import { useApp } from '../../state/AppContext'
 import { ENVIRONMENTS } from '../../config/constants'
 import { validateConnection } from '../../api/validateConnection'
 import ThemeToggle from '../common/ThemeToggle'
+import Logo from '../common/Logo'
 
 // Pistas accionables según el tipo de error que devuelve el proxy.
 const ERROR_HINTS = {
@@ -48,17 +49,9 @@ export default function ConnectScreen() {
       </div>
 
       <div className="relative w-full max-w-md animate-fade-in">
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-white shadow-lg shadow-accent/30">
-            <span className="relative flex h-3.5 w-3.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
-              <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-white" />
-            </span>
-          </div>
-          <div>
-            <h1 className="text-lg font-semibold leading-tight text-fg">Uber Live</h1>
-            <p className="text-xs text-faint">Centro de control de flota · 3PL Delivery</p>
-          </div>
+        <div className="mb-8">
+          <Logo className="h-10 w-auto" />
+          <p className="mt-2 text-xs text-faint">Centro de control de flota · 3PL Delivery</p>
         </div>
 
         <div className="rounded-2xl border border-line bg-panel p-6 shadow-soft">

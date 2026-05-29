@@ -10,6 +10,7 @@ import {
 import { useApp } from '../../state/AppContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import WhatsAppIcon from '../common/WhatsAppIcon'
+import Logo from '../common/Logo'
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,14 +39,17 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
         )}
       >
-        <div className="flex h-14 items-center gap-2.5 border-b border-line px-4">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-white shadow-md shadow-accent/30">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
-            </span>
-          </div>
-          {!sidebarCollapsed && <span className="truncate text-sm font-semibold text-fg">Uber Live</span>}
+        <div className="flex h-14 items-center border-b border-line px-4">
+          {sidebarCollapsed ? (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-white shadow-md shadow-accent/30">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/70" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
+              </span>
+            </div>
+          ) : (
+            <Logo className="h-7 w-auto" />
+          )}
         </div>
 
         <nav className="flex-1 space-y-1 p-2.5">

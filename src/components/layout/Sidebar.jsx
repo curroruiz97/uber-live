@@ -9,7 +9,9 @@ import {
 } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
 import { useWhatsApp } from '../../state/whatsapp'
+import { useMensatek } from '../../state/mensatek'
 import WhatsAppIcon from '../common/WhatsAppIcon'
+import MensatekIcon from '../common/MensatekIcon'
 import Logo from '../common/Logo'
 
 const NAV = [
@@ -17,12 +19,14 @@ const NAV = [
   { id: 'mapa', label: 'Mapa en vivo', icon: MapIcon },
   { id: 'riders', label: 'Riders', icon: Users },
   { id: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon },
+  { id: 'mensatek', label: 'Mensatek', icon: MensatekIcon },
   { id: 'config', label: 'Ajustes', icon: Settings },
 ]
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const { sidebarCollapsed, toggleSidebar, activeNav, setActiveNav } = useApp()
-  const { messagesToday } = useWhatsApp()
+  const { messagesToday: waToday } = useWhatsApp()
+  const { messagesToday: mkToday } = useMensatek()
 
   return (
     <>
@@ -56,7 +60,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
           {NAV.map((item) => {
             const Icon = item.icon
             const active = activeNav === item.id
-            const badge = item.id === 'whatsapp' ? messagesToday : 0
+            const badge = item.id === 'whatsapp' ? waToday : item.id === 'mensatek' ? mkToday : 0
             return (
               <button
                 key={item.id}

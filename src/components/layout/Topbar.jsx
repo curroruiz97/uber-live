@@ -12,6 +12,7 @@ const TITLES = {
   dashboard: 'Dashboard',
   mapa: 'Mapa en vivo',
   riders: 'Riders',
+  mensatek: 'Mensatek',
   config: 'Ajustes',
 }
 

@@ -4,6 +4,7 @@ import { ToastProvider } from './state/toast'
 import { AuthProvider, useAuth } from './state/AuthContext'
 import { AppProvider, useApp } from './state/AppContext'
 import { WhatsAppProvider } from './state/whatsapp'
+import { MensatekProvider } from './state/mensatek'
 import LoginScreen from './components/onboarding/LoginScreen'
 import ConnectScreen from './components/onboarding/ConnectScreen'
 import DashboardLayout from './components/layout/DashboardLayout'
@@ -29,7 +30,9 @@ function AuthGate() {
   return (
     <AppProvider>
       <WhatsAppProvider>
-        <Root />
+        <MensatekProvider>
+          <Root />
+        </MensatekProvider>
       </WhatsAppProvider>
     </AppProvider>
   )

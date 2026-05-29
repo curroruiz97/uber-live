@@ -19,6 +19,7 @@ import { ThemeSegmented } from '../common/ThemeToggle'
 import WhatsAppView from '../whatsapp/WhatsAppView'
 import WhatsAppIcon from '../common/WhatsAppIcon'
 import { useWhatsApp } from '../../state/whatsapp'
+import MensatekView from '../mensatek/MensatekView'
 
 function LoadingState() {
   return (
@@ -143,6 +144,8 @@ function Content({ activeNav }) {
   if (activeNav === 'config') return <ConfigView />
 
   if (activeNav === 'whatsapp') return <WhatsAppView />
+
+  if (activeNav === 'mensatek') return <MensatekView />
 
   if (activeNav === 'riders') {
     return (

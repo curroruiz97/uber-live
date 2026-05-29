@@ -13,6 +13,8 @@ export const UBER_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/function
 // Proxy de Mensatek (SMS/Email certificado). El API Token vive en los secrets de la
 // Edge Function, nunca en el navegador.
 export const MENSATEK_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/mensatek`
+// Guarda credenciales de integración por empresa (escribe org_secrets server-side).
+export const ORG_CRED_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/org-credentials`
 
 // Organización activa: la fija OrgContext y se envía como x-org-id a las Edge
 // Functions, que la revalidan contra org_members y cargan las credenciales de esa

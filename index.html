@@ -15,6 +15,20 @@
         }
       })()
     </script>
+    <script>
+      // Anti-FOUC del color de marca: aplica el acento de la última empresa antes de montar.
+      (function () {
+        try {
+          var a = JSON.parse(localStorage.getItem('ul-brand-accent') || 'null')
+          if (a && a.light && a.dark) {
+            var s = document.createElement('style')
+            s.id = 'brand-vars'
+            s.textContent = ':root{--c-accent:' + a.light + ';} .dark{--c-accent:' + a.dark + ';}'
+            document.head.appendChild(s)
+          }
+        } catch (e) {}
+      })()
+    </script>
     <!-- Favicon: variantes claro/oscuro según el tema del navegador -->
     <link rel="icon" type="image/png" href="/logo-light.png" />
     <link rel="icon" type="image/png" media="(prefers-color-scheme: dark)" href="/logo-dark.png" />

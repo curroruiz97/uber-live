@@ -21,25 +21,36 @@ function StatusPill({ configured }) {
   )
 }
 
+function VerifyResult({ result }) {
+  if (!result || result.status === 'idle') return null
+  const ok = result.status === 'ok'
+  return (
+    <p className={clsx('mt-3 flex items-center gap-1.5 text-xs', ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
+      {ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+      {result.msg}
+    </p>
+  )
+}
+
 export default function IntegrationsSection() {
   const { currentOrgId: orgId, isOwnerOrAdmin } = useOrg()
   const { toast } = useToast()
   const [integ, setInteg] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Uber form
   const [uClientId, setUClientId] = useState('')
   const [uSecret, setUSecret] = useState('')
   const [uScope, setUScope] = useState('')
   const [uEnv, setUEnv] = useState('sandbox')
   const [uSaving, setUSaving] = useState(false)
   const [uVerifying, setUVerifying] = useState(false)
+  const [uResult, setUResult] = useState(null)
 
-  // Mensatek form
   const [mUser, setMUser] = useState('')
   const [mToken, setMToken] = useState('')
   const [mSaving, setMSaving] = useState(false)
   const [mVerifying, setMVerifying] = useState(false)
+  const [mResult, setMResult] = useState(null)
 
   const load = useCallback(async () => {
     if (!orgId) return
@@ -53,9 +64,7 @@ export default function IntegrationsSection() {
     setLoading(false)
   }, [orgId])
 
-  useEffect(() => {
-    load()
-  }, [load])
+  useEffect(() => { load() }, [load])
 
   async function saveUber() {
     setUSaving(true)
@@ -69,14 +78,14 @@ export default function IntegrationsSection() {
     }
     setUSaving(false)
   }
-
   async function verifyUber() {
     setUVerifying(true)
+    setUResult({ status: 'idle' })
     try {
       const res = await createUberClient({ environment: uEnv }).getPing()
-      toast({ type: 'success', title: 'Conexión Uber OK', message: `${res.orgs ?? 0} organizaciones visibles` })
+      setUResult({ status: 'ok', msg: `Conexión correcta · ${res.orgs ?? 0} organizaciones visibles` })
     } catch (e) {
-      toast({ type: 'error', title: 'Falló la verificación', message: e.message })
+      setUResult({ status: 'error', msg: e.message })
     }
     setUVerifying(false)
   }
@@ -93,21 +102,19 @@ export default function IntegrationsSection() {
     }
     setMSaving(false)
   }
-
   async function verifyMensatek() {
     setMVerifying(true)
+    setMResult({ status: 'idle' })
     try {
       const res = await mensatekApi.credits()
-      toast({ type: 'success', title: 'Conexión Mensatek OK', message: `${(res.cred ?? 0).toLocaleString('es-ES')} créditos` })
+      setMResult({ status: 'ok', msg: `Conexión correcta · ${(res.cred ?? 0).toLocaleString('es-ES')} créditos disponibles` })
     } catch (e) {
-      toast({ type: 'error', title: 'Falló la verificación', message: e.message })
+      setMResult({ status: 'error', msg: e.message })
     }
     setMVerifying(false)
   }
 
-  if (loading) {
-    return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
-  }
+  if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
 
   const ro = !isOwnerOrAdmin
 
@@ -123,20 +130,18 @@ export default function IntegrationsSection() {
         icon={Plug}
         title="Uber Vehicle Solutions"
         subtitle="Datos de tu flota de riders (OAuth client credentials)"
-        right={<StatusPill configured={Boolean(integ?.uber_configured)} />}
+        right={
+          <div className="flex items-center gap-2">
+            <span className={clsx('rounded-full border px-2 py-0.5 text-[11px] font-medium', uEnv === 'production' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'border-line bg-inset text-muted')}>
+              {uEnv === 'production' ? 'Producción' : 'Sandbox'}
+            </span>
+            <StatusPill configured={Boolean(integ?.uber_configured)} />
+          </div>
+        }
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SettingsField label="Client ID" value={uClientId} onChange={setUClientId} disabled={ro} mono placeholder="Application ID de Uber" />
-          <SettingsField
-            label="Client Secret"
-            type="password"
-            value={uSecret}
-            onChange={setUSecret}
-            disabled={ro}
-            mono
-            placeholder={integ?.uber_last4 ? `•••• ${integ.uber_last4} (sin cambios)` : 'Secreto de la app'}
-            autoComplete="off"
-          />
+          <SettingsField label="Client Secret" type="password" value={uSecret} onChange={setUSecret} disabled={ro} mono placeholder={integ?.uber_last4 ? `•••• ${integ.uber_last4} (sin cambios)` : 'Secreto de la app'} autoComplete="off" />
           <SettingsField label="Scope (opcional)" value={uScope} onChange={setUScope} disabled={ro} mono placeholder="vehicle_suppliers..." />
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted">Entorno</label>
@@ -156,6 +161,7 @@ export default function IntegrationsSection() {
             </button>
           </div>
         )}
+        <VerifyResult result={uResult} />
       </SettingsCard>
 
       {/* Mensatek */}
@@ -167,16 +173,7 @@ export default function IntegrationsSection() {
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <SettingsField label="Usuario API" value={mUser} onChange={setMUser} disabled={ro} mono placeholder="Usuario API de Mensatek" />
-          <SettingsField
-            label="API Token"
-            type="password"
-            value={mToken}
-            onChange={setMToken}
-            disabled={ro}
-            mono
-            placeholder={integ?.mensatek_last4 ? `•••• ${integ.mensatek_last4} (sin cambios)` : 'Token de la API'}
-            autoComplete="off"
-          />
+          <SettingsField label="API Token" type="password" value={mToken} onChange={setMToken} disabled={ro} mono placeholder={integ?.mensatek_last4 ? `•••• ${integ.mensatek_last4} (sin cambios)` : 'Token de la API'} autoComplete="off" />
         </div>
         {!ro && (
           <div className="mt-4 flex flex-wrap gap-2">
@@ -188,6 +185,7 @@ export default function IntegrationsSection() {
             </button>
           </div>
         )}
+        <VerifyResult result={mResult} />
         <p className="mt-3 text-xs text-faint">Encuentra estas claves en tu panel de Mensatek: <em>Tus Datos → Configurar Cuenta</em>.</p>
       </SettingsCard>
 

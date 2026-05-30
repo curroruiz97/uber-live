@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { useOrg } from './OrgContext'
+import { whatsappCloud } from '../api/whatsappCloud'
 
 const WhatsAppContext = createContext(null)
 
@@ -29,18 +30,30 @@ function rowToLog(r) {
     channel: r.channel ?? 'wa.me',
   }
 }
+// Estado de la WhatsApp Business API (Cloud API) de la organización, leído de
+// org_integrations (no secreto). El token nunca llega aquí.
+function rowToCloud(r) {
+  return {
+    configured: Boolean(r?.whatsapp_configured),
+    phoneNumberId: r?.whatsapp_phone_number_id ?? '',
+    businessAccountId: r?.whatsapp_business_account_id ?? '',
+    last4: r?.whatsapp_last4 ?? '',
+    verifiedName: r?.whatsapp_verified_name ?? '',
+    displayPhone: r?.whatsapp_display_phone ?? '',
+    status: r?.whatsapp_status ?? 'idle',
+  }
+}
 
-// Persistencia en Supabase (Postgres + Realtime). El token de Meta NUNCA se guarda
-// (solo en memoria). Plantillas/ajustes se escriben con debounce para no hacer una
-// query por pulsación; el log de envíos se sincroniza en vivo entre el equipo.
+// Persistencia en Supabase (Postgres + Realtime). El token de la WhatsApp Business API
+// vive en org_secrets (servidor), nunca aquí. Plantillas/ajustes se escriben con
+// debounce; el log de envíos se sincroniza en vivo entre el equipo.
 export function WhatsAppProvider({ children }) {
   const { user } = useAuth()
   const { currentOrgId: orgId } = useOrg()
 
   const [contactMessage, setContactMessageState] = useState(DEFAULT_CONTACT)
-  const [metaConfig, setMetaConfigState] = useState({ phoneNumberId: '', businessAccountId: '' })
   const [quickTemplates, setQuickTemplates] = useState([])
-  const [metaToken, setMetaToken] = useState('') // solo en memoria
+  const [cloud, setCloud] = useState(() => rowToCloud(null))
   const [sentLog, setSentLog] = useState([])
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const writeTimers = useRef({})
@@ -50,18 +63,20 @@ export function WhatsAppProvider({ children }) {
     if (!orgId) return undefined
     let alive = true
     ;(async () => {
-      const [tpls, st, log] = await Promise.all([
+      const [tpls, st, log, integ] = await Promise.all([
         supabase.from('wa_templates').select('*').eq('org_id', orgId).order('created_at', { ascending: true }),
         supabase.from('org_settings').select('*').eq('org_id', orgId).maybeSingle(),
         supabase.from('wa_sent_log').select('*').eq('org_id', orgId).order('ts', { ascending: false }).limit(LOG_CAP),
+        supabase
+          .from('org_integrations')
+          .select('whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_configured, whatsapp_last4, whatsapp_verified_name, whatsapp_display_phone, whatsapp_status')
+          .eq('org_id', orgId)
+          .maybeSingle(),
       ])
       if (!alive) return
       setQuickTemplates(tpls.data ? tpls.data.map(rowToTemplate) : [])
       setContactMessageState(st.data?.contact_message ?? DEFAULT_CONTACT)
-      setMetaConfigState({
-        phoneNumberId: st.data?.meta_phone_number_id ?? '',
-        businessAccountId: st.data?.meta_business_account_id ?? '',
-      })
+      setCloud(rowToCloud(integ.data))
       setSentLog(log.data ? log.data.map(rowToLog) : [])
     })()
     return () => {
@@ -113,19 +128,20 @@ export function WhatsAppProvider({ children }) {
     [persistSettings],
   )
 
-  const setMetaConfig = useCallback(
-    (patch) => {
-      setMetaConfigState((s) => {
-        const next = { ...s, ...patch }
-        persistSettings({
-          meta_phone_number_id: next.phoneNumberId,
-          meta_business_account_id: next.businessAccountId,
-        })
-        return next
-      })
-    },
-    [persistSettings],
-  )
+  // Recarga el estado de la WhatsApp Business API tras guardar/verificar credenciales.
+  const reloadCloud = useCallback(async () => {
+    if (!orgId) return
+    const { data } = await supabase
+      .from('org_integrations')
+      .select('whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_configured, whatsapp_last4, whatsapp_verified_name, whatsapp_display_phone, whatsapp_status')
+      .eq('org_id', orgId)
+      .maybeSingle()
+    setCloud(rowToCloud(data))
+  }, [orgId])
+
+  // Envío vía WhatsApp Business API oficial (Edge Function `whatsapp`). El gating de
+  // plan y el descuento de créditos se aplican en el servidor. Devuelve { ok, wamid, waId }.
+  const sendCloud = useCallback((p) => whatsappCloud.send(p), [])
 
   const addTemplate = useCallback(
     async (tpl) => {
@@ -211,17 +227,17 @@ export function WhatsAppProvider({ children }) {
   }, [sentLog])
 
   const settings = useMemo(
-    () => ({ contactMessage, quickTemplates, metaConfig }),
-    [contactMessage, quickTemplates, metaConfig],
+    () => ({ contactMessage, quickTemplates }),
+    [contactMessage, quickTemplates],
   )
 
   const value = useMemo(
     () => ({
       settings,
-      metaToken,
-      setMetaToken,
+      cloud,
+      reloadCloud,
+      sendCloud,
       setContactMessage,
-      setMetaConfig,
       addTemplate,
       updateTemplate,
       removeTemplate,
@@ -235,9 +251,10 @@ export function WhatsAppProvider({ children }) {
     }),
     [
       settings,
-      metaToken,
+      cloud,
+      reloadCloud,
+      sendCloud,
       setContactMessage,
-      setMetaConfig,
       addTemplate,
       updateTemplate,
       removeTemplate,

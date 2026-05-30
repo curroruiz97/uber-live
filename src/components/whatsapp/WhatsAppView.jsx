@@ -7,14 +7,15 @@ import SentMessagesPanel from './SentMessagesPanel'
 export default function WhatsAppView() {
   return (
     <div className="space-y-4">
-      <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+      <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
         <Zap className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
-          <strong>Estado.</strong> Los botones de la tabla y el mapa abren{' '}
-          <span className="font-mono">wa.me</span> directamente (funciona ya). La conexión por QR
-          (Bloque B) usa un backend <strong>real</strong> de{' '}
-          <span className="font-mono">whatsapp-web.js</span>: el QR es real y escaneable. El envío vía
-          Meta Cloud API (Bloque A) y el envío masivo siguen siendo UI <strong>simulada</strong>.
+          <strong>WhatsApp Business API (oficial).</strong> El <strong>Bloque A</strong> usa la{' '}
+          <span className="font-mono">Meta Cloud API</span>: una vez conectada en{' '}
+          <strong>Ajustes → Integraciones</strong>, el envío masivo y por plantilla funciona{' '}
+          <strong>de verdad en producción</strong>. Los botones de la tabla y el mapa abren{' '}
+          <span className="font-mono">wa.me</span> (gratis, sin configuración). El{' '}
+          <strong>Bloque B</strong> (QR) es opcional y requiere servidor propio.
         </p>
       </div>
 

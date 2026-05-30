@@ -13,6 +13,9 @@ export const UBER_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/function
 // Proxy de Mensatek (SMS/Email certificado). El API Token vive en los secrets de la
 // Edge Function, nunca en el navegador.
 export const MENSATEK_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/mensatek`
+// WhatsApp Business API oficial (Meta Cloud API). El token permanente vive en
+// org_secrets (Edge Function), nunca en el navegador.
+export const WHATSAPP_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/whatsapp`
 // Guarda credenciales de integración por empresa (escribe org_secrets server-side).
 export const ORG_CRED_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/org-credentials`
 // URL pública del webhook de reports de Mensatek (se pega en el panel de Mensatek).

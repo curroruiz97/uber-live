@@ -104,8 +104,8 @@ export default function QrConnectBlock() {
 
   return (
     <CollapsibleCard
-      title="Bloque B · Conexión por QR (real)"
-      subtitle="whatsapp-web.js · sesión real en el backend"
+      title="Bloque B · Conexión por QR (opcional)"
+      subtitle="whatsapp-web.js · requiere servidor propio · no oficial"
       icon={QrCode}
       right={right}
     >

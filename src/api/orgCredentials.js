@@ -16,4 +16,6 @@ async function post(path, body) {
 export const orgCredentials = {
   saveUber: (p) => post('/uber', p),
   saveMensatek: (p) => post('/mensatek', p),
+  // p = { phone_number_id, business_account_id, token }
+  saveWhatsApp: (p) => post('/whatsapp', p),
 }

@@ -98,6 +98,32 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, configured: integ.mensatek_configured })
     }
 
+    if (path === '/whatsapp') {
+      // WhatsApp Business API (Meta Cloud API). El token permanente es el secreto;
+      // phone_number_id y business_account_id son config no secreta.
+      const phoneNumberId = String(body.phone_number_id ?? '').trim()
+      const businessAccountId = String(body.business_account_id ?? '').trim()
+      const token = String(body.token ?? '').trim()
+
+      await ensureRow(admin, 'org_secrets', orgId)
+      await ensureRow(admin, 'org_integrations', orgId)
+
+      const integ: any = {
+        whatsapp_phone_number_id: phoneNumberId,
+        whatsapp_business_account_id: businessAccountId,
+        updated_at: now,
+      }
+      if (token) {
+        await admin.from('org_secrets').update({ whatsapp_token: token, updated_at: now }).eq('org_id', orgId)
+        integ.whatsapp_last4 = last4(token)
+      }
+      const { data: sec } = await admin.from('org_secrets').select('whatsapp_token').eq('org_id', orgId).maybeSingle()
+      integ.whatsapp_configured = Boolean(phoneNumberId && sec?.whatsapp_token)
+      integ.whatsapp_status = integ.whatsapp_configured ? 'configured' : 'idle'
+      await admin.from('org_integrations').update(integ).eq('org_id', orgId)
+      return json(200, { ok: true, configured: integ.whatsapp_configured })
+    }
+
     return json(404, { error: 'not_found', message: `Ruta no soportada: ${path}` })
   } catch (e: any) {
     return json(500, { error: 'save_error', message: e.message })

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { Loader2, Save, CheckCircle2, XCircle, Plug, ShieldCheck, MessageSquareText, Copy } from 'lucide-react'
+import { Loader2, Save, CheckCircle2, XCircle, Plug, ShieldCheck, MessageSquareText, Copy, Cloud } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useOrg } from '../../../state/OrgContext'
 import { useToast } from '../../../state/toast'
 import { createUberClient } from '../../../api/uberClient'
 import { mensatekApi } from '../../../api/mensatekClient'
+import { whatsappCloud } from '../../../api/whatsappCloud'
 import { orgCredentials } from '../../../api/orgCredentials'
 import { MENSATEK_WEBHOOK_URL } from '../../../config/api'
 import SettingsField, { SettingsCard } from '../SettingsField'
@@ -53,6 +54,13 @@ export default function IntegrationsSection() {
   const [mVerifying, setMVerifying] = useState(false)
   const [mResult, setMResult] = useState(null)
 
+  const [wPhone, setWPhone] = useState('')
+  const [wWaba, setWWaba] = useState('')
+  const [wToken, setWToken] = useState('')
+  const [wSaving, setWSaving] = useState(false)
+  const [wVerifying, setWVerifying] = useState(false)
+  const [wResult, setWResult] = useState(null)
+
   const load = useCallback(async () => {
     if (!orgId) return
     setLoading(true)
@@ -62,6 +70,8 @@ export default function IntegrationsSection() {
     setUScope(data?.uber_scope || '')
     setUEnv(data?.uber_environment || 'sandbox')
     setMUser(data?.mensatek_api_user || '')
+    setWPhone(data?.whatsapp_phone_number_id || '')
+    setWWaba(data?.whatsapp_business_account_id || '')
     setLoading(false)
   }, [orgId])
 
@@ -125,6 +135,36 @@ export default function IntegrationsSection() {
       setMResult({ status: 'error', msg: e.message })
     }
     setMVerifying(false)
+  }
+
+  async function saveWhatsApp() {
+    setWSaving(true)
+    try {
+      const res = await orgCredentials.saveWhatsApp({ phone_number_id: wPhone.trim(), business_account_id: wWaba.trim(), token: wToken.trim() })
+      setWToken('')
+      await load()
+      if (res?.configured) toast({ type: 'success', title: 'WhatsApp Business API guardada' })
+      else toast({ type: 'warning', title: 'Faltan datos', message: 'Rellena el Phone Number ID y el token permanente.' })
+    } catch (e) {
+      toast({ type: 'error', title: 'No se pudo guardar', message: e.message })
+    }
+    setWSaving(false)
+  }
+  async function verifyWhatsApp() {
+    setWVerifying(true)
+    setWResult({ status: 'idle' })
+    try {
+      if (wPhone.trim() || wWaba.trim() || wToken.trim()) {
+        await orgCredentials.saveWhatsApp({ phone_number_id: wPhone.trim(), business_account_id: wWaba.trim(), token: wToken.trim() })
+        setWToken('')
+        await load()
+      }
+      const res = await whatsappCloud.verify()
+      setWResult({ status: 'ok', msg: `Conexión correcta · ${res.verifiedName || 'número'}${res.displayPhone ? ` (${res.displayPhone})` : ''}` })
+    } catch (e) {
+      setWResult({ status: 'error', msg: e.message })
+    }
+    setWVerifying(false)
   }
 
   if (loading) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted" /></div>
@@ -220,11 +260,42 @@ export default function IntegrationsSection() {
         </div>
       </SettingsCard>
 
-      {/* WhatsApp */}
-      <SettingsCard icon={MessageSquareText} title="WhatsApp" subtitle="Contacto directo (wa.me) y sesión por QR">
-        <p className="text-sm text-muted">
-          El botón de WhatsApp por rider (<span className="font-mono">wa.me</span>) funciona sin configuración. La sesión por
-          QR para envío directo se gestiona desde la sección <strong className="text-fg">WhatsApp</strong> del menú.
+      {/* WhatsApp Business API (Meta Cloud API) */}
+      <SettingsCard
+        icon={Cloud}
+        title="WhatsApp Business API"
+        subtitle="Envío oficial vía Meta Cloud API (funciona en producción)"
+        right={<StatusPill configured={Boolean(integ?.whatsapp_configured)} />}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <SettingsField label="Phone Number ID" value={wPhone} onChange={setWPhone} disabled={ro} mono placeholder="Ej. 123456789012345" />
+          <SettingsField label="Business Account ID (WABA)" value={wWaba} onChange={setWWaba} disabled={ro} mono placeholder="Ej. 987654321098765 (para plantillas)" />
+          <SettingsField
+            label="Token permanente"
+            type="password"
+            value={wToken}
+            onChange={setWToken}
+            disabled={ro}
+            mono
+            placeholder={integ?.whatsapp_last4 ? `•••• ${integ.whatsapp_last4} (sin cambios)` : 'EAAG… (token de System User)'}
+            autoComplete="off"
+          />
+        </div>
+        {!ro && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button onClick={saveWhatsApp} disabled={wSaving} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
+              {wSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
+            </button>
+            <button onClick={verifyWhatsApp} disabled={wVerifying} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-fg transition hover:bg-inset disabled:opacity-50">
+              {wVerifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Verificar
+            </button>
+          </div>
+        )}
+        <VerifyResult result={wResult} />
+        <p className="mt-3 text-xs text-faint">
+          Genera estas claves en <em>Meta Business → WhatsApp → Configuración de la API</em>. El token permanente
+          se crea con un <em>System User</em> con permiso <span className="font-mono">whatsapp_business_messaging</span>.
+          El botón por rider (<span className="font-mono">wa.me</span>) seguirá funcionando gratis sin esto.
         </p>
       </SettingsCard>
     </div>

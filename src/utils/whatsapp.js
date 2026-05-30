@@ -11,18 +11,15 @@ export function waLink(phone, message) {
   return `https://wa.me/${p}${text}`
 }
 
-export const TEMPLATE_VARS = ['nombre', 'pedido_id', 'store', 'turno_inicio', 'turno_fin']
+export const TEMPLATE_VARS = ['nombre', 'pedido_id', 'store']
 
-// Rellena {nombre} {pedido_id} {store} {turno_inicio} {turno_fin} con datos del rider.
-// turno_inicio/turno_fin no existen en la API actual -> '—'.
+// Rellena {nombre} {pedido_id} {store} con datos del rider.
 export function buildMessage(template, rider) {
   if (!template) return ''
   const vars = {
     nombre: rider?.name ?? '',
     pedido_id: rider?.currentDelivery?.id ?? '—',
     store: rider?.zone?.label ?? '—',
-    turno_inicio: rider?.shiftStart ?? '—',
-    turno_fin: rider?.shiftEnd ?? '—',
   }
   return template.replace(/\{(\w+)\}/g, (m, key) => (key in vars ? vars[key] : m))
 }

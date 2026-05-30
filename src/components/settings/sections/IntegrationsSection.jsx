@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import clsx from 'clsx'
-import { Loader2, Save, CheckCircle2, XCircle, Plug, ShieldCheck, MessageSquareText } from 'lucide-react'
+import { Loader2, Save, CheckCircle2, XCircle, Plug, ShieldCheck, MessageSquareText, Copy } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useOrg } from '../../../state/OrgContext'
 import { useToast } from '../../../state/toast'
 import { createUberClient } from '../../../api/uberClient'
 import { mensatekApi } from '../../../api/mensatekClient'
 import { orgCredentials } from '../../../api/orgCredentials'
+import { MENSATEK_WEBHOOK_URL } from '../../../config/api'
 import SettingsField, { SettingsCard } from '../SettingsField'
 
 function StatusPill({ configured }) {
@@ -199,6 +200,24 @@ export default function IntegrationsSection() {
         )}
         <VerifyResult result={mResult} />
         <p className="mt-3 text-xs text-faint">Encuentra estas claves en tu panel de Mensatek: <em>Tus Datos → Configurar Cuenta</em>.</p>
+
+        {/* Webhook de reports de entrega */}
+        <div className="mt-4 rounded-lg border border-line bg-inset/40 p-3">
+          <p className="text-xs font-medium text-fg">Reports de entrega (opcional)</p>
+          <p className="mt-1 text-xs text-muted">
+            Para recibir el estado de entrega en tiempo real, pega esta URL en tu panel de Mensatek
+            (<em>Configuración API → recepción de reports en tu web</em>):
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-md border border-line bg-panel px-2 py-1.5 font-mono text-[11px] text-muted">{MENSATEK_WEBHOOK_URL}</code>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(MENSATEK_WEBHOOK_URL); toast({ type: 'success', title: 'URL copiada' }) }}
+              className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-line px-2.5 py-1.5 text-xs font-medium text-fg transition hover:bg-inset"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copiar
+            </button>
+          </div>
+        </div>
       </SettingsCard>
 
       {/* WhatsApp */}

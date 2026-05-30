@@ -1,8 +1,7 @@
-// Edge Function (Deno): proxy de Mensatek (API v7) — MULTI-TENANT.
-// Resuelve la organización del llamante (header x-org-id, validado contra org_members)
-// y carga sus credenciales de Mensatek desde org_integrations/org_secrets (service_role),
-// con fallback a los secrets de entorno (org Sapiens durante la transición).
-// El API Token nunca llega al navegador. POST form-urlencoded con Basic Auth.
+// Edge Function (Deno): proxy de Mensatek (API v7) — MULTI-TENANT + gating de plan.
+// Resuelve la org del llamante, carga sus credenciales (org_secrets) y reenvía a
+// api.mensatek.com/v7 con Basic Auth. Antes de enviar, valida suscripción y descuenta
+// créditos del plan (con reembolso de fallos). El API Token nunca llega al navegador.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const CORS = {
@@ -24,14 +23,12 @@ type Creds = { apiUser: string; apiToken: string; base: string }
 function basicAuth(creds: Creds) {
   return 'Basic ' + btoa(`${creds.apiUser}:${creds.apiToken}`)
 }
-
 function firstOf(data: any) {
   if (Array.isArray(data)) return data[0] ?? {}
   return data ?? {}
 }
 
-// Parser numérico tolerante: Mensatek devuelve importes en formato español
-// (ej. "14.970,00" => 14970) y a veces como número. Maneja ambos y el formato inglés.
+// Parser numérico tolerante (ES "14.970,00" -> 14970; EN "14970.00" -> 14970).
 function parseNum(v: any): number {
   if (typeof v === 'number') return Number.isFinite(v) ? v : 0
   let s = String(v ?? '').trim().replace(/[^\d.,-]/g, '')
@@ -48,12 +45,16 @@ function parseNum(v: any): number {
   const n = Number(s)
   return Number.isFinite(n) ? n : 0
 }
+// Busca el campo de saldo por nombre (Saldo / Cred / Creditos…).
 function rawCred(res: any) {
-  return res?.Cred ?? res?.Creditos ?? res?.creditos ?? res?.credits ?? res?.credito ?? null
+  if (res == null || typeof res !== 'object') return null
+  for (const k of Object.keys(res)) {
+    if (/saldo|cred/i.test(k) && res[k] != null && res[k] !== '' && typeof res[k] !== 'object') return res[k]
+  }
+  return null
 }
 
-// Respaldo: si Mensatek responde en texto ("Creditos:14970.00;Res:1;"), lo convertimos
-// a objeto clave:valor.
+// Respaldo: respuesta en texto ("Saldo:14970,00;Res:1;") -> objeto clave:valor.
 function parseTxt(t: string): any {
   const out: Record<string, string> = {}
   for (const part of String(t ?? '').split(/[;\n\r]+/)) {
@@ -67,7 +68,6 @@ async function call(creds: Creds, fn: string, fields: Record<string, string>) {
   const body = new URLSearchParams({ ...fields, Resp: 'JSON' })
   let r: Response
   try {
-    // Resp=JSON también en la query: algunas funciones de Mensatek solo lo respetan ahí.
     r = await fetch(`${creds.base}/${fn}?Resp=JSON`, {
       method: 'POST',
       headers: {
@@ -102,13 +102,21 @@ async function call(creds: Creds, fn: string, fields: Record<string, string>) {
     err.kind = 'http'
     throw err
   }
-  return firstOf(data)
+  const obj = firstOf(data)
+  // Mensatek devuelve 200 con Res:-1 cuando las credenciales no son válidas: lo
+  // tratamos como error de autenticación real (para no mostrar "0" silencioso).
+  if (Number(obj?.Res) === -1) {
+    const err: any = new Error('Mensatek rechazó las credenciales: ' + (obj.Error || 'Usuario API / API Token no válidos.'))
+    err.status = 401
+    err.kind = 'auth'
+    throw err
+  }
+  return obj
 }
 
 async function getCredits(creds: Creds) {
   const res = await call(creds, 'GetCreditos', {})
-  console.log('[mensatek] GetCreditos raw:', JSON.stringify(res))
-  return { ok: res.Res != null || rawCred(res) != null, cred: parseNum(rawCred(res)), raw: res }
+  return { ok: true, cred: parseNum(rawCred(res)), raw: res }
 }
 
 async function sendSms(creds: Creds, p: any) {
@@ -195,7 +203,6 @@ async function getReport(creds: Creds, p: any) {
   return await call(creds, fn, { Idmensaje: String(p.idMensaje ?? '') })
 }
 
-// Resuelve la org del llamante y carga sus credenciales (con fallback a env).
 async function resolveOrgCreds(userClient: any, adminClient: any, requestedOrgId: string) {
   let orgId = requestedOrgId
   if (orgId) {
@@ -275,7 +282,6 @@ Deno.serve(async (req) => {
 
     if (path === '/credits') return json(200, await getCredits(creds))
 
-    // Envío con gating de plan: suscripción activa + consumo atómico de créditos.
     if (path === '/send-sms' || path === '/send-email') {
       const isEmail = path === '/send-email'
       const recipients = Array.isArray(payload.destinatarios) ? payload.destinatarios.length : 0
@@ -296,7 +302,6 @@ Deno.serve(async (req) => {
         if (recipients > 0) await adminClient.rpc('grant_credits', { p_org: orgId, p_amount: recipients, p_bucket: 'included', p_reason: 'refund', p_channel: channel, p_ref: null })
         throw e
       }
-      // Reembolso de lo no entregado.
       if (!res.ok && recipients > 0) {
         await adminClient.rpc('grant_credits', { p_org: orgId, p_amount: recipients, p_bucket: 'included', p_reason: 'refund', p_channel: channel, p_ref: null })
       } else if (res.noEnviados > 0) {

@@ -15,6 +15,8 @@ export const UBER_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/function
 export const MENSATEK_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/mensatek`
 // Guarda credenciales de integración por empresa (escribe org_secrets server-side).
 export const ORG_CRED_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/org-credentials`
+// URL pública del webhook de reports de Mensatek (se pega en el panel de Mensatek).
+export const MENSATEK_WEBHOOK_URL = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/mensatek-webhook`
 
 // Organización activa: la fija OrgContext y se envía como x-org-id a las Edge
 // Functions, que la revalidan contra org_members y cargan las credenciales de esa

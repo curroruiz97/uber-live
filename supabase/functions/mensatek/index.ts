@@ -282,7 +282,32 @@ Deno.serve(async (req) => {
       return json(503, { error: 'not_configured', message: 'Esta organización no tiene configuradas las credenciales de Mensatek.' })
     }
 
-    if (path === '/credits') return json(200, await getCredits(creds))
+    if (path === '/credits') {
+      // Diagnóstico: registra fuente de credenciales + resultado/erros (sin secretos).
+      const meta: any = {
+        orgId,
+        userLen: creds.apiUser.length,
+        tokenLen: creds.apiToken.length,
+        userMatch: creds.apiUser === '1524432897EB0Z173952553100000000',
+        tokenMatch: creds.apiToken === '076A3CA292CD6FA4AA7F314814A27EFE',
+        base: creds.base,
+      }
+      try {
+        const c = await getCredits(creds)
+        meta.ok = true
+        meta.cred = c.cred
+        meta.raw = c.raw
+        await adminClient.from('mensatek_debug').insert({ kind: 'credits_ok', payload: meta })
+        return json(200, c)
+      } catch (e: any) {
+        meta.ok = false
+        meta.err_status = e.status
+        meta.err_kind = e.kind
+        meta.err_msg = String(e.message).slice(0, 200)
+        await adminClient.from('mensatek_debug').insert({ kind: 'credits_err', payload: meta })
+        throw e
+      }
+    }
 
     if (path === '/send-sms' || path === '/send-email') {
       const isEmail = path === '/send-email'

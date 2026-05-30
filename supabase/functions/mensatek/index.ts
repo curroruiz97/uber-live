@@ -52,11 +52,23 @@ function rawCred(res: any) {
   return res?.Cred ?? res?.Creditos ?? res?.creditos ?? res?.credits ?? res?.credito ?? null
 }
 
+// Respaldo: si Mensatek responde en texto ("Creditos:14970.00;Res:1;"), lo convertimos
+// a objeto clave:valor.
+function parseTxt(t: string): any {
+  const out: Record<string, string> = {}
+  for (const part of String(t ?? '').split(/[;\n\r]+/)) {
+    const i = part.indexOf(':')
+    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim()
+  }
+  return out
+}
+
 async function call(creds: Creds, fn: string, fields: Record<string, string>) {
   const body = new URLSearchParams({ ...fields, Resp: 'JSON' })
   let r: Response
   try {
-    r = await fetch(`${creds.base}/${fn}`, {
+    // Resp=JSON también en la query: algunas funciones de Mensatek solo lo respetan ahí.
+    r = await fetch(`${creds.base}/${fn}?Resp=JSON`, {
       method: 'POST',
       headers: {
         Authorization: basicAuth(creds),
@@ -76,7 +88,7 @@ async function call(creds: Creds, fn: string, fields: Record<string, string>) {
   try {
     data = text ? JSON.parse(text) : {}
   } catch {
-    data = { raw: text }
+    data = parseTxt(text)
   }
   if (r.status === 401) {
     const err: any = new Error('Mensatek rechazó las credenciales (Usuario API / API Token).')

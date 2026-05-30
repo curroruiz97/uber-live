@@ -1,5 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { STATUS_ORDER } from '../config/constants'
+
+const CONN_KEY = 'ul-connection'
+const NAV_KEY = 'ul-nav'
 
 const AppContext = createContext(null)
 
@@ -23,18 +26,51 @@ export function filterRiders(riders, filters) {
 const DEFAULT_FILTERS = { statuses: [...STATUS_ORDER], zone: 'all', search: '' }
 
 export function AppProvider({ children }) {
-  // Credenciales SOLO en estado (no localStorage). Se pierden al recargar.
-  const [connection, setConnection] = useState({
-    token: '',
-    environment: 'sandbox',
-    demoMode: false,
-    connected: false,
+  // La conexión se restaura de localStorage para sobrevivir a recargas. NO se guarda
+  // el token manual (dato sensible); las credenciales reales viven server-side por org.
+  const [connection, setConnection] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem(CONN_KEY) || 'null')
+      if (s && s.connected) {
+        return { token: '', environment: s.environment || 'sandbox', demoMode: Boolean(s.demoMode), connected: true }
+      }
+    } catch {
+      /* ignore */
+    }
+    return { token: '', environment: 'sandbox', demoMode: false, connected: false }
   })
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [activeNav, setActiveNav] = useState('dashboard')
+  const [activeNav, setActiveNav] = useState(() => {
+    try {
+      return localStorage.getItem(NAV_KEY) || 'dashboard'
+    } catch {
+      return 'dashboard'
+    }
+  })
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [selectedRiderId, setSelectedRiderId] = useState(null)
+
+  // Persistir conexión (sin token) y sección activa.
+  useEffect(() => {
+    try {
+      if (connection.connected) {
+        localStorage.setItem(CONN_KEY, JSON.stringify({ connected: true, environment: connection.environment, demoMode: connection.demoMode }))
+      } else {
+        localStorage.removeItem(CONN_KEY)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [connection.connected, connection.environment, connection.demoMode])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(NAV_KEY, activeNav)
+    } catch {
+      /* ignore */
+    }
+  }, [activeNav])
 
   const connectDemo = useCallback(() => {
     setConnection({ token: '', environment: 'sandbox', demoMode: true, connected: true })

@@ -43,7 +43,17 @@ export function AuthProvider({ children }) {
           options: { emailRedirectTo: window.location.origin },
         }),
       resend: (email) => supabase.auth.resend({ type: 'signup', email: email.trim() }),
-      signOut: () => supabase.auth.signOut(),
+      signOut: () => {
+        // Limpia el estado local de conexión/sección/org al cerrar sesión.
+        try {
+          localStorage.removeItem('ul-connection')
+          localStorage.removeItem('ul-nav')
+          localStorage.removeItem('ul-org')
+        } catch {
+          /* ignore */
+        }
+        return supabase.auth.signOut()
+      },
     }),
     [session, loading],
   )

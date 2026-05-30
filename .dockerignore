@@ -1,7 +1,5 @@
 node_modules
 dist
-.wwebjs_auth
-.wwebjs_cache
 .git
 .gitignore
 .env

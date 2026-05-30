@@ -12,10 +12,6 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 
-# Sesión y caché de whatsapp-web.js (backend) — no subir a git
-.wwebjs_auth
-.wwebjs_cache
-
 # Herramientas locales de Claude (config de preview, planes, etc.)
 .claude
 COMMIT_MSG.tmp

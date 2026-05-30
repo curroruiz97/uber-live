@@ -4,8 +4,8 @@
 // Lo validamos contra GET {SUPABASE_URL}/auth/v1/user (con la anon key como apikey).
 // Cacheamos el resultado ~60s por token para no llamar a Supabase en cada request.
 //
-// Sin esto, los endpoints /api/uber y /api/wa quedarían abiertos al exponer el backend
-// en producción (fuga de PII de conductores, control de WhatsApp, etc.).
+// Sin esto, el endpoint /api/uber quedaría abierto al exponer el backend en
+// producción (fuga de PII de conductores).
 
 const cache = new Map() // token -> { ok, exp }
 const TTL_MS = 60_000

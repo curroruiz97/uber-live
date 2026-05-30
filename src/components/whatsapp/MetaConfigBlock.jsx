@@ -100,7 +100,7 @@ export default function MetaConfigBlock() {
 
   return (
     <CollapsibleCard
-      title="Bloque A · WhatsApp Business API"
+      title="WhatsApp Business API"
       subtitle="Meta Cloud API · oficial · funciona en producción"
       icon={Cloud}
       right={<StatusPill state={pill} />}

@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url'
 import { createUberService } from './lib/uberService.js'
 import { requireAuth } from './lib/auth.js'
 import { uberRouter } from './routes/uber.js'
-import { whatsappRouter } from './routes/whatsapp.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const distDir = path.resolve(__dirname, '..', 'dist')
@@ -22,9 +21,8 @@ export function createApp() {
   // Liveness simple del backend (abierto, sin datos sensibles).
   app.get('/api/health', (req, res) => res.json({ ok: true }))
 
-  // /api/uber y /api/wa exigen un token de Supabase válido.
+  // /api/uber exige un token de Supabase válido.
   app.use('/api/uber', requireAuth(), uberRouter(createUberService(process.env)))
-  app.use('/api/wa', requireAuth(), whatsappRouter())
 
   // En producción servimos el SPA ya compilado -> un solo despliegue.
   // (En dev el front lo sirve Vite y reenvía /api aquí por proxy.)

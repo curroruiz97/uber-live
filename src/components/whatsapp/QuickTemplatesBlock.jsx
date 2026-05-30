@@ -9,7 +9,7 @@ export default function QuickTemplatesBlock() {
 
   return (
     <CollapsibleCard
-      title="Bloque C · Mensajes rápidos"
+      title="Mensajes rápidos"
       subtitle="Plantillas para envío masivo y respuestas"
       icon={MessageSquareText}
       right={

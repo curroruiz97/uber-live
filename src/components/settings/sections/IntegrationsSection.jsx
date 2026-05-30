@@ -69,10 +69,11 @@ export default function IntegrationsSection() {
   async function saveUber() {
     setUSaving(true)
     try {
-      await orgCredentials.saveUber({ client_id: uClientId.trim(), client_secret: uSecret.trim(), scope: uScope.trim(), environment: uEnv })
+      const res = await orgCredentials.saveUber({ client_id: uClientId.trim(), client_secret: uSecret.trim(), scope: uScope.trim(), environment: uEnv })
       setUSecret('')
-      toast({ type: 'success', title: 'Credenciales de Uber guardadas' })
-      load()
+      await load()
+      if (res?.configured) toast({ type: 'success', title: 'Credenciales de Uber guardadas' })
+      else toast({ type: 'warning', title: 'Faltan datos', message: 'Rellena Client ID y Client Secret.' })
     } catch (e) {
       toast({ type: 'error', title: 'No se pudo guardar', message: e.message })
     }
@@ -82,6 +83,11 @@ export default function IntegrationsSection() {
     setUVerifying(true)
     setUResult({ status: 'idle' })
     try {
+      if (uClientId.trim() || uSecret.trim()) {
+        await orgCredentials.saveUber({ client_id: uClientId.trim(), client_secret: uSecret.trim(), scope: uScope.trim(), environment: uEnv })
+        setUSecret('')
+        await load()
+      }
       const res = await createUberClient({ environment: uEnv }).getPing()
       setUResult({ status: 'ok', msg: `Conexión correcta · ${res.orgs ?? 0} organizaciones visibles` })
     } catch (e) {
@@ -93,10 +99,11 @@ export default function IntegrationsSection() {
   async function saveMensatek() {
     setMSaving(true)
     try {
-      await orgCredentials.saveMensatek({ api_user: mUser.trim(), api_token: mToken.trim() })
+      const res = await orgCredentials.saveMensatek({ api_user: mUser.trim(), api_token: mToken.trim() })
       setMToken('')
-      toast({ type: 'success', title: 'Credenciales de Mensatek guardadas' })
-      load()
+      await load()
+      if (res?.configured) toast({ type: 'success', title: 'Credenciales de Mensatek guardadas' })
+      else toast({ type: 'warning', title: 'Faltan datos', message: 'Rellena Usuario API y API Token.' })
     } catch (e) {
       toast({ type: 'error', title: 'No se pudo guardar', message: e.message })
     }
@@ -106,6 +113,11 @@ export default function IntegrationsSection() {
     setMVerifying(true)
     setMResult({ status: 'idle' })
     try {
+      if (mUser.trim() || mToken.trim()) {
+        await orgCredentials.saveMensatek({ api_user: mUser.trim(), api_token: mToken.trim() })
+        setMToken('')
+        await load()
+      }
       const res = await mensatekApi.credits()
       setMResult({ status: 'ok', msg: `Conexión correcta · ${(res.cred ?? 0).toLocaleString('es-ES')} créditos disponibles` })
     } catch (e) {

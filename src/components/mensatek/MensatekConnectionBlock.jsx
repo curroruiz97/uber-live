@@ -82,12 +82,11 @@ export default function MensatekConnectionBlock() {
 
       {conn.status === 'not_configured' && (
         <div className="border-t border-line bg-amber-500/5 p-4 text-xs text-amber-700 dark:text-amber-300">
-          <p className="font-medium">Falta configurar las credenciales en Supabase.</p>
+          <p className="font-medium">Aún no has configurado tus credenciales de Mensatek.</p>
           <p className="mt-1 text-amber-700/80 dark:text-amber-300/80">
-            Añade los secrets <span className="font-mono">MENSATEK_API_USER</span> y{' '}
-            <span className="font-mono">MENSATEK_API_TOKEN</span> a la Edge Function{' '}
-            <span className="font-mono">mensatek</span> (los encuentras en tu panel de Mensatek →{' '}
-            <em>Tus Datos → Configurar Cuenta</em>).
+            Ve a <strong>Ajustes → Integraciones / APIs → Mensatek</strong>, introduce tu{' '}
+            <strong>Usuario API</strong> y tu <strong>API Token</strong> (panel de Mensatek →{' '}
+            <em>Tus Datos → Configurar Cuenta</em>) y pulsa <strong>Guardar</strong>.
           </p>
         </div>
       )}

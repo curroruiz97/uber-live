@@ -30,6 +30,28 @@ function firstOf(data: any) {
   return data ?? {}
 }
 
+// Parser numérico tolerante: Mensatek devuelve importes en formato español
+// (ej. "14.970,00" => 14970) y a veces como número. Maneja ambos y el formato inglés.
+function parseNum(v: any): number {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
+  let s = String(v ?? '').trim().replace(/[^\d.,-]/g, '')
+  if (!s) return 0
+  const hasC = s.includes(',')
+  const hasD = s.includes('.')
+  if (hasC && hasD) {
+    s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '')
+  } else if (hasC) {
+    s = /,\d{1,2}$/.test(s) ? s.replace(',', '.') : s.replace(/,/g, '')
+  } else if (hasD && /^\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, '')
+  }
+  const n = Number(s)
+  return Number.isFinite(n) ? n : 0
+}
+function rawCred(res: any) {
+  return res?.Cred ?? res?.Creditos ?? res?.creditos ?? res?.credits ?? res?.credito ?? null
+}
+
 async function call(creds: Creds, fn: string, fields: Record<string, string>) {
   const body = new URLSearchParams({ ...fields, Resp: 'JSON' })
   let r: Response
@@ -73,7 +95,8 @@ async function call(creds: Creds, fn: string, fields: Record<string, string>) {
 
 async function getCredits(creds: Creds) {
   const res = await call(creds, 'GetCreditos', {})
-  return { ok: Number(res.Res) >= 0 || res.Cred != null, cred: Number(res.Cred) || 0, raw: res }
+  console.log('[mensatek] GetCreditos raw:', JSON.stringify(res))
+  return { ok: res.Res != null || rawCred(res) != null, cred: parseNum(rawCred(res)), raw: res }
 }
 
 async function sendSms(creds: Creds, p: any) {
@@ -149,8 +172,8 @@ function shapeSend(res: any) {
     enviados: Number(res.Enviados ?? res.Mensajes ?? 0),
     noEnviados: Number(res.NoEnviados ?? 0),
     duplicados: Number(res.Duplicados ?? 0),
-    cred: res.Cred != null ? Number(res.Cred) : null,
-    creditosUsados: res.CreditosUsados != null ? Number(res.CreditosUsados) : null,
+    cred: rawCred(res) != null ? parseNum(rawCred(res)) : null,
+    creditosUsados: res.CreditosUsados != null ? parseNum(res.CreditosUsados) : null,
     raw: res,
   }
 }

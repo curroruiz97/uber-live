@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import {
   Send, ShieldCheck, FileSignature, Mail, MessageSquareText, X, Loader2, CheckCircle2,
-  AlertTriangle, Users,
+  AlertTriangle, Users, Search,
 } from 'lucide-react'
 import { useFleet } from '../../state/useFleetData'
 import { useMensatek } from '../../state/mensatek'
@@ -30,7 +30,10 @@ export default function MensatekSendPanel() {
   const plan = usePlan()
 
   const [channel, setChannel] = useState('sms')
+  const [mode, setMode] = useState('riders') // 'riders' (persona concreta) | 'audience'
   const [audience, setAudience] = useState('active')
+  const [picked, setPicked] = useState(() => new Set())
+  const [search, setSearch] = useState('')
   const [smsText, setSmsText] = useState(config.smsText)
   const [subject, setSubject] = useState(config.emailSubject)
   const [emailBody, setEmailBody] = useState(config.emailBody)
@@ -42,16 +45,32 @@ export default function MensatekSendPanel() {
   useEffect(() => setEmailBody(config.emailBody), [config.emailBody])
 
   const isEmail = channel === 'email'
-  const audienceRiders = useMemo(
-    () => riders.filter(AUDIENCES.find((a) => a.id === audience)?.fn ?? (() => true)),
-    [riders, audience],
-  )
+  const hasContact = (r) => (isEmail ? isValidEmail(r.email) : Boolean(toMensatekPhone(r.phone)))
+
+  // Base de destinatarios: por persona concreta (elegidos) o por audiencia.
+  const baseRiders = useMemo(() => {
+    if (mode === 'audience') return riders.filter(AUDIENCES.find((a) => a.id === audience)?.fn ?? (() => true))
+    return riders.filter((r) => picked.has(r.id))
+  }, [riders, mode, audience, picked])
+
   // Elegibles = tienen el dato de contacto del canal.
-  const eligible = useMemo(
-    () => audienceRiders.filter((r) => (isEmail ? isValidEmail(r.email) : toMensatekPhone(r.phone))),
-    [audienceRiders, isEmail],
-  )
-  const skipped = audienceRiders.length - eligible.length
+  const eligible = useMemo(() => baseRiders.filter(hasContact), [baseRiders, isEmail]) // eslint-disable-line react-hooks/exhaustive-deps
+  const skipped = baseRiders.length - eligible.length
+
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return []
+    return riders.filter((r) => !picked.has(r.id) && (r.name || '').toLowerCase().includes(q)).slice(0, 8)
+  }, [riders, search, picked])
+
+  function togglePick(id) {
+    setPicked((prev) => {
+      const n = new Set(prev)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  }
 
   const channelTemplates = templates.filter((t) => (isEmail ? t.channel === 'email' : t.channel === 'sms'))
   const preview = eligible[0]
@@ -105,26 +124,86 @@ export default function MensatekSendPanel() {
           })}
         </div>
 
-        {/* Audiencia */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
-            <Users className="h-3.5 w-3.5" /> Audiencia
-          </span>
-          <select
-            value={audience}
-            onChange={(e) => setAudience(e.target.value)}
-            className="rounded-lg border border-line bg-inset px-2.5 py-1.5 text-sm text-fg outline-none focus:border-accent/60"
-          >
-            {AUDIENCES.map((a) => (
-              <option key={a.id} value={a.id}>{a.label}</option>
-            ))}
-          </select>
-          <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-accent">
-            {eligible.length} destinatarios
-          </span>
-          {skipped > 0 && (
-            <span className="text-xs text-faint">· {skipped} sin {isEmail ? 'email' : 'teléfono'} se omiten</span>
+        {/* Destinatarios: persona concreta o audiencia */}
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-inset p-1 sm:w-72">
+            <button
+              onClick={() => setMode('riders')}
+              className={clsx('rounded-md px-2 py-1.5 text-xs font-medium transition', mode === 'riders' ? 'bg-panel text-fg shadow-sm ring-1 ring-accent/30' : 'text-muted hover:text-fg')}
+            >
+              Persona concreta
+            </button>
+            <button
+              onClick={() => setMode('audience')}
+              className={clsx('rounded-md px-2 py-1.5 text-xs font-medium transition', mode === 'audience' ? 'bg-panel text-fg shadow-sm ring-1 ring-accent/30' : 'text-muted hover:text-fg')}
+            >
+              Por audiencia
+            </button>
+          </div>
+
+          {mode === 'audience' ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+                <Users className="h-3.5 w-3.5" /> Audiencia
+              </span>
+              <select
+                value={audience}
+                onChange={(e) => setAudience(e.target.value)}
+                className="rounded-lg border border-line bg-inset px-2.5 py-1.5 text-sm text-fg outline-none focus:border-accent/60"
+              >
+                {AUDIENCES.map((a) => (
+                  <option key={a.id} value={a.id}>{a.label}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Busca un rider por nombre…"
+                  className="w-full rounded-lg border border-line bg-inset py-2 pl-8 pr-2.5 text-sm text-fg placeholder-faint outline-none focus:border-accent/60 sm:max-w-sm"
+                />
+                {searchResults.length > 0 && (
+                  <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-line bg-panel shadow-soft sm:max-w-sm">
+                    {searchResults.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => { togglePick(r.id); setSearch('') }}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm transition hover:bg-inset"
+                      >
+                        <span className="truncate text-fg">{r.name}</span>
+                        <span className="shrink-0 font-mono text-[11px] text-faint">{isEmail ? (r.email || 'sin email') : (r.phone || 'sin teléfono')}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {picked.size > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {riders.filter((r) => picked.has(r.id)).map((r) => (
+                    <span key={r.id} className={clsx('inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs', hasContact(r) ? 'bg-accent/10 text-accent' : 'bg-red-500/10 text-red-500')}>
+                      {r.name}
+                      <button onClick={() => togglePick(r.id)} className="transition hover:opacity-70" aria-label="Quitar"><X className="h-3 w-3" /></button>
+                    </span>
+                  ))}
+                  <button onClick={() => setPicked(new Set())} className="text-xs text-muted underline-offset-2 transition hover:underline">Quitar todos</button>
+                </div>
+              )}
+            </div>
           )}
+
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 font-semibold tabular-nums text-accent">
+              {eligible.length} destinatario{eligible.length === 1 ? '' : 's'}
+            </span>
+            {skipped > 0 && (
+              <span className="text-faint">· {skipped} sin {isEmail ? 'email' : 'teléfono'} se omite{skipped === 1 ? '' : 'n'}</span>
+            )}
+            {mode === 'riders' && picked.size === 0 && <span className="text-faint">· busca y elige a quién enviar</span>}
+          </div>
         </div>
 
         {/* Plantillas del canal */}

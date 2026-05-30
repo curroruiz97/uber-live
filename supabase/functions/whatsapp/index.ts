@@ -307,13 +307,15 @@ Deno.serve(async (req) => {
       if (!sub || !['active', 'trialing'].includes(sub.status)) {
         return json(402, { error: 'subscription_inactive', message: 'La suscripción de tu empresa no está activa.' })
       }
-      const { data: okC } = await adminClient.rpc('consume_credits', {
+      const { data: okC, error: cErr } = await adminClient.rpc('consume_credits', {
         p_org: orgId,
         p_amount: 1,
         p_channel: 'whatsapp',
         p_ref: payload?.riderId ? String(payload.riderId) : null,
       })
-      if (okC === false) return json(402, { error: 'insufficient_credits', message: 'Créditos insuficientes para este envío.' })
+      // Si la RPC falla, NO enviamos (evita cursar mensajes sin descontar crédito).
+      if (cErr) return json(500, { error: 'credit_error', message: 'No se pudieron verificar los créditos del plan.' })
+      if (okC !== true) return json(402, { error: 'insufficient_credits', message: 'Créditos insuficientes para este envío.' })
 
       try {
         const res = await sendMessage(creds, payload)

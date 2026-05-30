@@ -14,7 +14,7 @@ const STATUS_STYLE = {
   error: 'bg-red-500/10 text-red-600 dark:text-red-400',
 }
 
-const CHANNEL_LABEL = { 'wa.me': 'wa.me', bulk: 'Masivo', api: 'API' }
+const CHANNEL_LABEL = { 'wa.me': 'wa.me', bulk: 'Masivo (demo)', cloud: 'Business API', api: 'API' }
 
 function fmt(ts) {
   return new Date(ts).toLocaleString('es-ES', {
@@ -86,7 +86,7 @@ export default function SentMessagesPanel() {
           hint={
             hasFilters
               ? 'Ajusta los filtros para ver más.'
-              : 'Los mensajes enviados (wa.me, masivo o API) aparecerán aquí.'
+              : 'Los mensajes enviados (wa.me o WhatsApp Business API) aparecerán aquí.'
           }
         />
       ) : (

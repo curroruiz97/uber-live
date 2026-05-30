@@ -28,12 +28,18 @@ export function getActiveOrgId() {
 }
 
 // Cabecera de autorización con el token de la sesión de Supabase + el org activo.
-// El backend valida ambos (getUser + pertenencia a la org).
+// El backend valida ambos (getUser + pertenencia a la org). Refresca el token si falta
+// o está a punto de caducar, para evitar el "Missing authorization header" tras recargar
+// con una sesión cuyo access_token ya había expirado.
 export async function authHeaders() {
-  const { data } = await supabase.auth.getSession()
-  const token = data?.session?.access_token
+  let session = (await supabase.auth.getSession()).data?.session
+  const expSoon = session?.expires_at && session.expires_at * 1000 < Date.now() + 60_000
+  if (!session?.access_token || expSoon) {
+    const refreshed = (await supabase.auth.refreshSession()).data?.session
+    if (refreshed?.access_token) session = refreshed
+  }
   const h = {}
-  if (token) h.Authorization = `Bearer ${token}`
+  if (session?.access_token) h.Authorization = `Bearer ${session.access_token}`
   if (activeOrgId) h['x-org-id'] = activeOrgId
   return h
 }

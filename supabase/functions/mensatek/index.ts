@@ -65,10 +65,12 @@ function parseTxt(t: string): any {
 }
 
 async function call(creds: Creds, fn: string, fields: Record<string, string>) {
+  // Resp=JSON SOLO en el body. Añadirlo también a la query rompía la autenticación
+  // en GetCreditos (Mensatek devolvía Res:-1). El body es lo que funciona.
   const body = new URLSearchParams({ ...fields, Resp: 'JSON' })
   let r: Response
   try {
-    r = await fetch(`${creds.base}/${fn}?Resp=JSON`, {
+    r = await fetch(`${creds.base}/${fn}`, {
       method: 'POST',
       headers: {
         Authorization: basicAuth(creds),

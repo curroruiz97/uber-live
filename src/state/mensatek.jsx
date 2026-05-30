@@ -224,11 +224,9 @@ export function MensatekProvider({ children }) {
       setConn({ status: 'ok', checkedAt: Date.now(), message: '' })
       return { ok: true, cred: res.cred }
     } catch (e) {
-      setConn({
-        status: e.kind === 'not_configured' ? 'not_configured' : 'error',
-        checkedAt: Date.now(),
-        message: e.message,
-      })
+      const status =
+        e.kind === 'not_configured' ? 'not_configured' : e.kind === 'auth' ? 'auth' : 'error'
+      setConn({ status, checkedAt: Date.now(), message: e.message })
       return { ok: false, error: e }
     }
   }, [])

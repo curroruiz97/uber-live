@@ -8,6 +8,7 @@ function StatusPill({ status }) {
     ok: { cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', icon: CheckCircle2, txt: 'Conectada' },
     checking: { cls: 'border-line bg-inset text-muted', icon: Loader2, txt: 'Verificando…' },
     error: { cls: 'border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400', icon: XCircle, txt: 'Error' },
+    auth: { cls: 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400', icon: AlertTriangle, txt: 'IP no autorizada' },
     not_configured: { cls: 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400', icon: AlertTriangle, txt: 'Sin configurar' },
     idle: { cls: 'border-line bg-inset text-muted', icon: AlertTriangle, txt: 'Sin verificar' },
   }
@@ -25,9 +26,10 @@ export default function MensatekConnectionBlock() {
   const { credits, conn, checkConnection } = useMensatek()
   const [busy, setBusy] = useState(false)
 
-  // Verifica una vez al entrar para reflejar el estado real.
+  // Verifica una sola vez al entrar (si no se ha comprobado ya), para no repetir el
+  // 401 en bucle cada vez que se entra a la sección.
   useEffect(() => {
-    checkConnection()
+    if (conn.status === 'idle') checkConnection()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -87,6 +89,17 @@ export default function MensatekConnectionBlock() {
             Ve a <strong>Ajustes → Integraciones / APIs → Mensatek</strong>, introduce tu{' '}
             <strong>Usuario API</strong> y tu <strong>API Token</strong> (panel de Mensatek →{' '}
             <em>Tus Datos → Configurar Cuenta</em>) y pulsa <strong>Guardar</strong>.
+          </p>
+        </div>
+      )}
+      {conn.status === 'auth' && (
+        <div className="border-t border-line bg-amber-500/5 p-4 text-xs text-amber-700 dark:text-amber-300">
+          <p className="font-medium">Mensatek rechaza la conexión desde el servidor.</p>
+          <p className="mt-1 text-amber-700/80 dark:text-amber-300/80">
+            Tus credenciales son correctas, pero Mensatek solo acepta llamadas desde IPs autorizadas
+            y la del servidor no lo está. Entra en tu panel de Mensatek →{' '}
+            <em>Tus Datos → Configurar Cuenta → API</em> y <strong>desactiva la restricción por IP</strong>{' '}
+            (deja la lista en blanco) o pide a soporte@mensatek.com que permita IPs de servidor.
           </p>
         </div>
       )}

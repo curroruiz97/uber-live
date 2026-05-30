@@ -18,3 +18,4 @@ dist-ssr
 
 # Herramientas locales de Claude (config de preview, planes, etc.)
 .claude
+COMMIT_MSG.tmp

@@ -48,7 +48,7 @@ export async function initNativeShell() {
   // Splash: la ocultamos cuando la web ya está montada (evita el "flash blanco").
   try {
     const { SplashScreen } = await import('@capacitor/splash-screen')
-    await SplashScreen.hide()
+    await SplashScreen.hide({ fadeOutDuration: 250 })
   } catch {
     /* ignore */
   }

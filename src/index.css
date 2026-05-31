@@ -283,9 +283,17 @@ html.native * {
 .rider-marker.is-active .ring {
   animation: rider-pulse 1.9s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }
+.rider-marker.is-selected .ring {
+  animation: rider-pulse 1.7s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
 .rider-marker.is-selected .dot {
   width: 20px;
   height: 20px;
+  /* Halo del rider seleccionado: anillo del color de estado + glow suave. */
+  box-shadow:
+    0 0 0 2px rgb(var(--c-panel)),
+    0 0 0 4px currentColor,
+    0 0 16px 3px currentColor;
 }
 
 @keyframes rider-pulse {

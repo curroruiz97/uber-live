@@ -80,7 +80,7 @@ export default function RidersTable() {
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-soft">
+    <div className="overflow-hidden rounded-2xl border border-line bg-panel shadow-elev-1">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <h2 className="text-sm font-semibold text-fg">Riders</h2>
         <span className="text-xs text-faint">

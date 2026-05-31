@@ -12,6 +12,7 @@ import {
 import { useApp, filterRiders } from '../../state/AppContext'
 import { useFleet } from '../../state/useFleetData'
 import { useTheme } from '../../state/ThemeContext'
+import { impactLight } from '../../native/haptics'
 import RiderMarker from './RiderMarker'
 
 function FitBounds({ riders }) {
@@ -52,7 +53,7 @@ function InvalidateSize({ trigger }) {
 
 function MapLegend() {
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-col gap-1 rounded-lg border border-line bg-panel/90 px-2.5 py-2 text-[11px] shadow-soft backdrop-blur">
+    <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-col gap-1 rounded-xl border border-line-strong bg-elevated/80 px-2.5 py-2 text-[11px] shadow-elev-2 backdrop-blur-xl">
       {STATUS_ORDER.map((id) => {
         const s = STATUS[id]
         return (
@@ -94,7 +95,7 @@ export default function FleetMap({ height = 'h-[360px] md:h-[440px]' }) {
         'isolate overflow-hidden border-line shadow-soft',
         fullscreen
           ? 'fixed inset-0 z-[60] rounded-none border-0'
-          : `relative ${height} rounded-xl border`,
+          : `relative ${height} rounded-2xl border shadow-elev-1`,
       )}
     >
       <MapContainer
@@ -127,14 +128,17 @@ export default function FleetMap({ height = 'h-[360px] md:h-[440px]' }) {
       <MapLegend />
 
       <div className="pointer-events-none absolute right-3 top-3 z-[500] flex items-center gap-2">
-        <span className="rounded-lg border border-line bg-panel/90 px-2.5 py-1 text-[11px] text-muted shadow-soft backdrop-blur">
+        <span className="rounded-full border border-line-strong bg-elevated/80 px-2.5 py-1 text-[11px] font-medium tabular-nums text-muted shadow-elev-2 backdrop-blur-xl">
           {visible.length} riders visibles
         </span>
         <button
-          onClick={() => setFullscreen((f) => !f)}
+          onClick={() => {
+            impactLight()
+            setFullscreen((f) => !f)
+          }}
           title={fullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
           aria-label={fullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-          className="pointer-events-auto rounded-lg border border-line bg-panel/90 p-1.5 text-muted shadow-soft backdrop-blur transition hover:text-fg"
+          className="tappable pointer-events-auto rounded-xl border border-line-strong bg-elevated/80 p-2 text-muted shadow-elev-2 backdrop-blur-xl transition hover:text-fg"
         >
           {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </button>

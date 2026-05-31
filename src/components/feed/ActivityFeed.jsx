@@ -10,7 +10,7 @@ export default function ActivityFeed() {
   const now = useNow(1000)
 
   return (
-    <div className="flex max-h-[480px] flex-col rounded-xl border border-line bg-panel shadow-soft xl:sticky xl:top-[72px] xl:max-h-[calc(100vh-92px)]">
+    <div className="flex max-h-[480px] flex-col rounded-2xl border border-line bg-panel shadow-elev-1 xl:sticky xl:top-[72px] xl:max-h-[calc(100vh-92px)]">
       <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-fg">
           <Activity className="h-4 w-4 text-accent" /> Actividad

@@ -22,7 +22,7 @@ export default function FilterBar() {
   const cities = [...new Set(zones.map((z) => z.city))]
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-panel p-3 shadow-soft">
+    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-panel p-3 shadow-elev-1">
       <div className="relative min-w-[180px] flex-1">
         <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
         <input

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import StatusBadge from '../common/StatusBadge'
+import Avatar from '../common/Avatar'
 import { RiderDetailBody, RiderDetailActions } from './RiderDetailContent'
 import { pushBackHandler } from '../../native/backStack'
 import { impactLight, selection } from '../../native/haptics'
@@ -159,10 +160,13 @@ export default function RiderSheet({ rider, delivery, now, open, onClose }) {
             <span className="h-1.5 w-10 rounded-full bg-line-strong" />
           </div>
           <div className="flex items-start justify-between gap-3 px-4 pb-3">
-            <div className="min-w-0">
-              <h2 className="truncate text-[17px] font-semibold text-fg">{rider.name}</h2>
-              <div className="mt-1.5">
-                <StatusBadge status={rider.status} size="sm" />
+            <div className="flex min-w-0 items-center gap-3">
+              <Avatar name={rider.name} size="lg" />
+              <div className="min-w-0">
+                <h2 className="truncate text-[17px] font-semibold text-fg">{rider.name}</h2>
+                <div className="mt-1.5">
+                  <StatusBadge status={rider.status} size="sm" />
+                </div>
               </div>
             </div>
             <button

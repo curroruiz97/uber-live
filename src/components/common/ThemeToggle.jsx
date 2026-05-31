@@ -1,16 +1,20 @@
 import clsx from 'clsx'
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme } from '../../state/ThemeContext'
+import { selection } from '../../native/haptics'
 
 export default function ThemeToggle() {
   const { resolved, toggle } = useTheme()
   const isDark = resolved === 'dark'
   return (
     <button
-      onClick={toggle}
+      onClick={() => {
+        selection()
+        toggle()
+      }}
       title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
       aria-label="Cambiar tema"
-      className="rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg"
+      className="tappable rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg"
     >
       {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>

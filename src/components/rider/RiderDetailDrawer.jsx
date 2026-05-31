@@ -5,6 +5,7 @@ import { useApp } from '../../state/AppContext'
 import { useFleet } from '../../state/useFleetData'
 import { useNow } from '../../state/useNow'
 import StatusBadge from '../common/StatusBadge'
+import Avatar from '../common/Avatar'
 import { RiderDetailBody, RiderDetailActions } from './RiderDetailContent'
 import RiderSheet from './RiderSheet'
 import { pushBackHandler } from '../../native/backStack'
@@ -52,10 +53,13 @@ export default function RiderDetailDrawer() {
           {rider && (
             <div className="flex h-full flex-col">
               <div className="flex items-start justify-between border-b border-line p-4 pt-[max(1rem,env(safe-area-inset-top))]">
-                <div>
-                  <h2 className="text-base font-semibold text-fg">{rider.name}</h2>
-                  <div className="mt-1.5">
-                    <StatusBadge status={rider.status} size="sm" />
+                <div className="flex items-center gap-3">
+                  <Avatar name={rider.name} size="md" />
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-semibold text-fg">{rider.name}</h2>
+                    <div className="mt-1.5">
+                      <StatusBadge status={rider.status} size="sm" />
+                    </div>
                   </div>
                 </div>
                 <button

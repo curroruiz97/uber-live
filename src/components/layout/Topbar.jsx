@@ -8,6 +8,7 @@ import { ENVIRONMENTS } from '../../config/constants'
 import LiveIndicator from '../common/LiveIndicator'
 import ThemeToggle from '../common/ThemeToggle'
 import OrgSwitcher from './OrgSwitcher'
+import { impactLight } from '../../native/haptics'
 
 const TITLES = {
   dashboard: 'Dashboard',
@@ -28,6 +29,7 @@ export default function Topbar({ onToggleMobile, onOpenPalette }) {
   const [spinning, setSpinning] = useState(false)
 
   function handleRefresh() {
+    impactLight()
     setSpinning(true)
     refreshNow()
     setTimeout(() => setSpinning(false), 700)
@@ -90,7 +92,7 @@ export default function Topbar({ onToggleMobile, onOpenPalette }) {
         <LiveIndicator seconds={secondsUntilRefresh} />
         <button
           onClick={handleRefresh}
-          className="rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg"
+          className="tappable rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg"
           title="Actualizar ahora"
           aria-label="Actualizar ahora"
         >

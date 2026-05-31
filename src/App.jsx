@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { ThemeProvider } from './state/ThemeContext'
 import { ToastProvider } from './state/toast'
+import { NetworkProvider } from './state/NetworkContext'
 import { AuthProvider, useAuth } from './state/AuthContext'
 import { AppProvider, useApp } from './state/AppContext'
 import { OrgProvider, useOrg } from './state/OrgContext'
@@ -13,6 +14,8 @@ import CreateOrgWizard from './components/onboarding/CreateOrgWizard'
 import SubscriptionGate from './components/billing/SubscriptionGate'
 import ConnectScreen from './components/onboarding/ConnectScreen'
 import DashboardLayout from './components/layout/DashboardLayout'
+import NativeBridge from './native/NativeBridge'
+import AppLock from './components/common/AppLock'
 
 function Root() {
   const { connected } = useApp()
@@ -85,11 +88,15 @@ function PlanGate({ children }) {
 export default function App() {
   return (
     <ThemeProvider>
+      <NativeBridge />
       <ToastProvider>
-        <AuthProvider>
-          <AuthGate />
-        </AuthProvider>
+        <NetworkProvider>
+          <AuthProvider>
+            <AuthGate />
+          </AuthProvider>
+        </NetworkProvider>
       </ToastProvider>
+      <AppLock />
     </ThemeProvider>
   )
 }

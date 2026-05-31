@@ -1,0 +1,27 @@
+{
+  "appId": "com.sapiens.telcolive",
+  "appName": "Sapiens Telco Live",
+  "webDir": "dist",
+  "backgroundColor": "#09090b",
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "launchAutoHide": false,
+      "backgroundColor": "#09090b",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_CROP",
+      "splashImmersive": true
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": true
+    },
+    "StatusBar": {
+      "overlaysWebView": false,
+      "style": "DARK"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

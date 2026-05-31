@@ -13,6 +13,7 @@ const TITLES = {
   dashboard: 'Dashboard',
   mapa: 'Mapa en vivo',
   riders: 'Riders',
+  whatsapp: 'WhatsApp',
   mensatek: 'Mensatek',
   config: 'Ajustes',
 }
@@ -35,10 +36,11 @@ export default function Topbar({ onToggleMobile, onOpenPalette }) {
   const env = ENVIRONMENTS[environment]
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-app/80 px-3 backdrop-blur sm:gap-3 sm:px-4">
+    <header className="sticky top-0 z-20 border-b border-line bg-app/80 backdrop-blur pt-safe">
+      <div className="flex h-14 items-center gap-2 px-3 sm:gap-3 sm:px-4">
       <button
         onClick={onToggleMobile}
-        className="shrink-0 rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg md:hidden"
+        className="hidden shrink-0 rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg"
         aria-label="Abrir menú"
       >
         <Menu className="h-5 w-5" />
@@ -116,6 +118,7 @@ export default function Topbar({ onToggleMobile, onOpenPalette }) {
             <Power className="h-4 w-4" />
           </button>
         </div>
+      </div>
       </div>
     </header>
   )

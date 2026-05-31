@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import clsx from 'clsx'
 import { X, Phone, MapPin, Package, Clock, Bike, Hash, Mail, Route } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
@@ -6,6 +7,7 @@ import { useNow } from '../../state/useNow'
 import StatusBadge from '../common/StatusBadge'
 import MiniRouteMap from '../map/MiniRouteMap'
 import { formatRouteTime, formatRelative } from '../../utils/time'
+import { pushBackHandler } from '../../native/backStack'
 
 function InfoRow({ icon: Icon, label, value, mono }) {
   return (
@@ -34,6 +36,15 @@ export default function RiderDetailDrawer() {
     ? deliveries.find((d) => d.id === rider.currentDelivery.id)
     : null
 
+  // El botón atrás (Android) cierra el panel del rider antes que navegar.
+  useEffect(() => {
+    if (!open) return undefined
+    return pushBackHandler(() => {
+      clearSelection()
+      return true
+    })
+  }, [open, clearSelection])
+
   return (
     <>
       {open && (
@@ -47,7 +58,7 @@ export default function RiderDetailDrawer() {
       >
         {rider && (
           <div className="flex h-full flex-col">
-            <div className="flex items-start justify-between border-b border-line p-4">
+            <div className="flex items-start justify-between border-b border-line p-4 pt-[max(1rem,env(safe-area-inset-top))]">
               <div>
                 <h2 className="text-base font-semibold text-fg">{rider.name}</h2>
                 <div className="mt-1.5">
@@ -128,7 +139,7 @@ export default function RiderDetailDrawer() {
               )}
             </div>
 
-            <div className="flex gap-2 border-t border-line p-4">
+            <div className="flex gap-2 border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               {rider.phone && (
                 <a
                   href={`tel:${rider.phone.replace(/\s/g, '')}`}

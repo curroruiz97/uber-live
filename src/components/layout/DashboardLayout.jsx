@@ -5,18 +5,24 @@ import { useFleetData, FleetContext } from '../../state/useFleetData'
 import { useToast } from '../../state/toast'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import BottomTabBar from './BottomTabBar'
+import MessagesSegmented from './MessagesSegmented'
 import KpiCards from '../kpis/KpiCards'
 import FleetMap from '../map/FleetMap'
-import FilterBar from '../filters/FilterBar'
+import Filters from '../filters/Filters'
 import RidersTable from '../table/RidersTable'
 import ActivityFeed from '../feed/ActivityFeed'
 import RiderDetailDrawer from '../rider/RiderDetailDrawer'
 import CommandPalette from '../common/CommandPalette'
 import Skeleton from '../common/Skeleton'
+import OfflineBanner from '../common/OfflineBanner'
+import PullToRefresh from '../common/PullToRefresh'
 import WhatsAppView from '../whatsapp/WhatsAppView'
 import MensatekView from '../mensatek/MensatekView'
 import SettingsLayout from '../settings/SettingsLayout'
 import TrialBanner from '../billing/TrialBanner'
+import { useNativeBackToDashboard } from '../../native/useNativeBack'
+import { useNativePush } from '../../native/useNativePush'
 
 function LoadingState() {
   return (
@@ -41,15 +47,22 @@ function LoadingState() {
 function Content({ activeNav }) {
   if (activeNav === 'config') return <SettingsLayout />
 
-  if (activeNav === 'whatsapp') return <WhatsAppView />
-
-  if (activeNav === 'mensatek') return <MensatekView />
+  // "Mensajes": en móvil se conmuta WhatsApp/Mensatek con el segmented; en escritorio
+  // cada canal tiene su entrada propia en el sidebar.
+  if (activeNav === 'whatsapp' || activeNav === 'mensatek') {
+    return (
+      <div className="space-y-4">
+        <MessagesSegmented />
+        {activeNav === 'whatsapp' ? <WhatsAppView /> : <MensatekView />}
+      </div>
+    )
+  }
 
   if (activeNav === 'riders') {
     return (
       <div className="space-y-4">
         <KpiCards />
-        <FilterBar />
+        <Filters />
         <RidersTable />
       </div>
     )
@@ -61,7 +74,7 @@ function Content({ activeNav }) {
         <KpiCards />
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
           <div className="min-w-0 space-y-3">
-            <FilterBar />
+            <Filters />
             <FleetMap height="h-[60vh]" />
           </div>
           <ActivityFeed />
@@ -76,7 +89,7 @@ function Content({ activeNav }) {
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-4">
           <FleetMap />
-          <FilterBar />
+          <Filters />
           <RidersTable />
         </div>
         <ActivityFeed />
@@ -97,6 +110,10 @@ export default function DashboardLayout() {
   const { toast } = useToast()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
+
+  // Puentes nativos: botón atrás → vuelve a Inicio; push notifications.
+  useNativeBackToDashboard()
+  useNativePush()
 
   // Atajos de teclado globales.
   useEffect(() => {
@@ -129,13 +146,17 @@ export default function DashboardLayout() {
         <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
         <div className={clsx('transition-all duration-200', app.sidebarCollapsed ? 'md:pl-16' : 'md:pl-60')}>
           <Topbar onToggleMobile={() => setMobileOpen(true)} onOpenPalette={() => setPaletteOpen(true)} />
+          <OfflineBanner />
           <TrialBanner />
-          <main className="overflow-x-clip p-3 sm:p-4">
-            {fleet.loading ? <LoadingState /> : <Content activeNav={app.activeNav} />}
-          </main>
+          <PullToRefresh onRefresh={fleet.refreshNow}>
+            <main className="overflow-x-clip px-3 pt-3 pb-tabbar sm:px-4 sm:pt-4 md:pb-4">
+              {fleet.loading ? <LoadingState /> : <Content activeNav={app.activeNav} />}
+            </main>
+          </PullToRefresh>
         </div>
       </div>
       <RiderDetailDrawer />
+      <BottomTabBar />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
     </FleetContext.Provider>
   )

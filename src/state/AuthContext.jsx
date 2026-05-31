@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { getAuthRedirectUrl } from '../native/deepLinks'
 
 const AuthContext = createContext(null)
 
@@ -40,9 +41,18 @@ export function AuthProvider({ children }) {
         supabase.auth.signUp({
           email: email.trim(),
           password,
-          options: { emailRedirectTo: window.location.origin },
+          // En la app móvil el enlace de confirmación vuelve por deep link; en web,
+          // al origin actual (donde detectSessionInUrl cierra el flujo).
+          options: { emailRedirectTo: getAuthRedirectUrl() },
         }),
       resend: (email) => supabase.auth.resend({ type: 'signup', email: email.trim() }),
+      // OAuth (Google / LinkedIn). En web redirige en la misma pestaña; en nativo
+      // abre el navegador del sistema y vuelve por el deep link de la app.
+      signInWithOAuth: (provider) =>
+        supabase.auth.signInWithOAuth({
+          provider,
+          options: { redirectTo: getAuthRedirectUrl() },
+        }),
       signOut: () => {
         // Limpia el estado local de conexión/sección/org al cerrar sesión.
         try {

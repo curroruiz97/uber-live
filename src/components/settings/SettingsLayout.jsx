@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import clsx from 'clsx'
-import { Building2, Users, Plug, CreditCard, Palette, Bell } from 'lucide-react'
+import { Building2, Users, Plug, CreditCard, Palette, Bell, ShieldCheck } from 'lucide-react'
 import AccountCompanySection from './sections/AccountCompanySection'
 import TeamSection from './sections/TeamSection'
 import IntegrationsSection from './sections/IntegrationsSection'
 import BillingSection from './sections/BillingSection'
 import BrandingSection from './sections/BrandingSection'
 import NotificationsSection from './sections/NotificationsSection'
+import SecuritySection from './sections/SecuritySection'
 
 const SECTIONS = [
   { id: 'cuenta', label: 'Cuenta y empresa', icon: Building2, Comp: AccountCompanySection },
@@ -15,6 +16,7 @@ const SECTIONS = [
   { id: 'facturacion', label: 'Facturación y plan', icon: CreditCard, Comp: BillingSection },
   { id: 'marca', label: 'Marca', icon: Palette, Comp: BrandingSection },
   { id: 'notificaciones', label: 'Notificaciones', icon: Bell, Comp: NotificationsSection },
+  { id: 'seguridad', label: 'Seguridad', icon: ShieldCheck, Comp: SecuritySection },
 ]
 
 export default function SettingsLayout() {

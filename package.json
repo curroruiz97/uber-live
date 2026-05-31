@@ -30,6 +30,7 @@
     "@capacitor/push-notifications": "^6.0.5",
     "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.3",
+    "@fontsource-variable/inter": "^5.2.8",
     "@supabase/supabase-js": "^2.106.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",

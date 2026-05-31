@@ -11,29 +11,30 @@ export const ENVIRONMENTS = {
 
 // Estados internos del rider + código de color (consistente en mapa / tabla / feed).
 // Las clases Tailwind se escriben literalmente para que el JIT las incluya en el build.
+// Paleta de estados (Revolut-grade): verde/azul/ámbar/gris vivos y consistentes.
 export const STATUS = {
   disponible: {
     id: 'disponible',
     label: 'Disponible',
-    hex: '#10b981',
-    text: 'text-emerald-600 dark:text-emerald-400',
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20 dark:border-emerald-500/30',
-    dot: 'bg-emerald-500',
+    hex: '#22C55E',
+    text: 'text-green-600 dark:text-green-400',
+    bg: 'bg-green-500/10',
+    border: 'border-green-500/20 dark:border-green-500/30',
+    dot: 'bg-green-500',
   },
   en_ruta: {
     id: 'en_ruta',
     label: 'En ruta',
-    hex: '#0ea5e9',
-    text: 'text-sky-600 dark:text-sky-400',
-    bg: 'bg-sky-500/10',
-    border: 'border-sky-500/20 dark:border-sky-500/30',
-    dot: 'bg-sky-500',
+    hex: '#3B82F6',
+    text: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20 dark:border-blue-500/30',
+    dot: 'bg-blue-500',
   },
   en_entrega: {
     id: 'en_entrega',
     label: 'En entrega',
-    hex: '#f59e0b',
+    hex: '#F59E0B',
     text: 'text-amber-600 dark:text-amber-400',
     bg: 'bg-amber-500/10',
     border: 'border-amber-500/20 dark:border-amber-500/30',
@@ -42,11 +43,11 @@ export const STATUS = {
   offline: {
     id: 'offline',
     label: 'Offline',
-    hex: '#71717a',
-    text: 'text-zinc-500 dark:text-zinc-400',
-    bg: 'bg-zinc-500/10',
-    border: 'border-zinc-500/20 dark:border-zinc-500/30',
-    dot: 'bg-zinc-500',
+    hex: '#6B7280',
+    text: 'text-gray-500 dark:text-gray-400',
+    bg: 'bg-gray-500/10',
+    border: 'border-gray-500/20 dark:border-gray-500/30',
+    dot: 'bg-gray-500',
   },
 }
 
@@ -61,8 +62,8 @@ export const BUSY_STATUSES = ['en_ruta', 'en_entrega']
 
 // Tipos de evento del feed de actividad
 export const EVENT_TYPES = {
-  assignment: { id: 'assignment', label: 'Asignación', text: 'text-sky-600 dark:text-sky-400', dot: 'bg-sky-500' },
-  completed: { id: 'completed', label: 'Completado', text: 'text-emerald-600 dark:text-emerald-400', dot: 'bg-emerald-500' },
+  assignment: { id: 'assignment', label: 'Asignación', text: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500' },
+  completed: { id: 'completed', label: 'Completado', text: 'text-green-600 dark:text-green-400', dot: 'bg-green-500' },
   cancellation: { id: 'cancellation', label: 'Cancelación', text: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
 }
 

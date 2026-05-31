@@ -2,12 +2,12 @@
   "appId": "com.sapiens.telcolive",
   "appName": "Sapiens Telco Live",
   "webDir": "dist",
-  "backgroundColor": "#09090b",
+  "backgroundColor": "#0A0B0D",
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 600,
       "launchAutoHide": false,
-      "backgroundColor": "#09090b",
+      "backgroundColor": "#0A0B0D",
       "showSpinner": false,
       "androidScaleType": "CENTER_CROP",
       "splashImmersive": true

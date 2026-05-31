@@ -13,8 +13,11 @@
           var t = localStorage.getItem('ul-theme') || 'dark'
           var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.classList.toggle('dark', dark)
+          // Pinta el fondo base antes de que cargue el CSS (cero flash blanco).
+          document.documentElement.style.backgroundColor = dark ? '#0A0B0D' : '#F7F8FA'
         } catch (e) {
           document.documentElement.classList.add('dark')
+          document.documentElement.style.backgroundColor = '#0A0B0D'
         }
       })()
     </script>

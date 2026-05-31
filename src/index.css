@@ -7,26 +7,54 @@
    Los valores son tripletes RGB para poder usar opacidad (rgb(var(--c) / .5)).
    =========================================================================== */
 :root {
-  --c-app: 248 248 250; /* fondo de página */
-  --c-panel: 255 255 255; /* tarjetas / superficies */
-  --c-inset: 244 244 245; /* inputs / huecos / hover */
-  --c-line: 228 228 231; /* bordes */
-  --c-fg: 24 24 27; /* texto principal */
-  --c-muted: 82 82 91; /* texto secundario */
-  --c-faint: 113 113 122; /* texto terciario */
-  --c-accent: 249 115 22; /* orange-500 — naranja Sapiens */
+  /* Light a paridad del dark (fintech sobrio, no blanco plano). */
+  --c-app: 247 248 250; /* fondo de página */
+  --c-panel: 255 255 255; /* superficie / tarjeta */
+  --c-elevated: 255 255 255; /* modal / popover (eleva con sombra) */
+  --c-inset: 243 244 247; /* inputs / huecos / hover */
+  --c-line: 226 228 232; /* borde sutil */
+  --c-line-strong: 205 208 214; /* borde marcado */
+  --c-fg: 17 18 20; /* texto primario */
+  --c-muted: 90 94 102; /* texto secundario */
+  --c-faint: 138 142 150; /* texto terciario */
+  --c-accent: 249 115 22; /* naranja Sapiens (marca real) */
+
+  /* Estados de rider (paleta viva y consistente en mapa/tabla/feed). */
+  --c-active: 34 197 94; /* #22C55E disponible */
+  --c-delivery: 59 130 246; /* #3B82F6 en ruta */
+  --c-busy: 245 158 11; /* #F59E0B en entrega */
+  --c-offline: 107 114 128; /* #6B7280 offline */
+  --c-alert: 239 68 68; /* #EF4444 incidencia */
+
+  /* Sistema de movimiento (curvas y duraciones). */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-micro: 150ms;
+  --dur-base: 260ms;
+  --dur-screen: 360ms;
+
   color-scheme: light;
 }
 
 .dark {
-  --c-app: 9 9 11;
-  --c-panel: 24 24 27;
-  --c-inset: 39 39 42;
-  --c-line: 39 39 42;
-  --c-fg: 244 244 245;
-  --c-muted: 161 161 170;
-  --c-faint: 113 113 122;
-  --c-accent: 251 146 60; /* orange-400, más vivo sobre fondo oscuro */
+  --c-app: 10 11 13; /* #0A0B0D casi-negro grafito */
+  --c-panel: 20 21 24; /* #141518 superficie */
+  --c-elevated: 28 30 34; /* #1C1E22 elevado */
+  --c-inset: 26 28 32; /* inputs / hover */
+  --c-line: 38 40 46; /* borde sutil (~blanco 8%) */
+  --c-line-strong: 56 59 67; /* borde marcado (~blanco 14%) */
+  --c-fg: 245 246 247; /* #F5F6F7 */
+  --c-muted: 154 157 165; /* #9A9DA5 */
+  --c-faint: 94 98 107; /* #5E626B */
+  --c-accent: 251 146 60; /* naranja, más vivo sobre fondo oscuro */
+
+  --c-active: 34 197 94;
+  --c-delivery: 59 130 246;
+  --c-busy: 245 158 11;
+  --c-offline: 107 114 128;
+  --c-alert: 239 68 68;
+
   color-scheme: dark;
 }
 
@@ -59,9 +87,37 @@ body,
 body {
   @apply bg-app font-sans text-fg antialiased;
   margin: 0;
+  /* Datos numéricos siempre tabulares (no bailan al actualizar en vivo). */
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  /* Transición de tema suave (dark/light). */
   transition:
-    background-color 0.25s ease,
-    color 0.25s ease;
+    background-color var(--dur-base) var(--ease-standard),
+    color var(--dur-base) var(--ease-standard);
+}
+
+/* Press-state físico: escala leve con resorte en cualquier elemento `tappable`. */
+@layer utilities {
+  .tappable {
+    transition: transform var(--dur-micro) var(--ease-out);
+    touch-action: manipulation;
+  }
+  .tappable:active {
+    transform: scale(0.97);
+  }
+}
+
+/* Respeta la preferencia de movimiento reducido: degrada a casi-instantáneo. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ===========================================================================
@@ -93,6 +149,20 @@ html.native [contenteditable='true'] {
    La clase `kb-open` la añade/quita el shell nativo (Keyboard plugin). */
 html.kb-open .app-tabbar {
   display: none;
+}
+
+/* En la app nativa: scrollbars ocultas (manteniendo el scroll) + momentum iOS, para
+   que el desplazamiento se sienta como en una app, no como una página web. */
+html.native {
+  -webkit-overflow-scrolling: touch;
+}
+html.native *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+html.native * {
+  scrollbar-width: none;
 }
 
 /* ===========================================================================

@@ -6,7 +6,7 @@ export { isNative, isAndroid, isIOS, platform } from './platform'
 export { pushBackHandler } from './backStack'
 
 // Color de fondo de la barra de estado (Android) por tema, en hex sin alfa.
-const STATUS_BG = { dark: '#09090b', light: '#f8f8fa' }
+const STATUS_BG = { dark: '#0A0B0D', light: '#F7F8FA' }
 
 let _statusBar = null
 async function statusBar() {

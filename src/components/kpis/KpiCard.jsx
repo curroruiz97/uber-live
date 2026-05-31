@@ -3,11 +3,11 @@ import CountUp from '../common/CountUp'
 import Sparkline from '../common/Sparkline'
 
 const ACCENTS = {
-  emerald: { chip: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10', hex: '#10b981' },
-  sky: { chip: 'text-sky-600 dark:text-sky-400 bg-sky-500/10', hex: '#0ea5e9' },
-  amber: { chip: 'text-amber-600 dark:text-amber-400 bg-amber-500/10', hex: '#f59e0b' },
-  indigo: { chip: 'text-orange-600 dark:text-orange-400 bg-orange-500/10', hex: '#f97316' },
-  red: { chip: 'text-red-600 dark:text-red-400 bg-red-500/10', hex: '#ef4444' },
+  emerald: { chip: 'text-green-600 dark:text-green-400 bg-green-500/10', hex: '#22C55E' },
+  sky: { chip: 'text-blue-600 dark:text-blue-400 bg-blue-500/10', hex: '#3B82F6' },
+  amber: { chip: 'text-amber-600 dark:text-amber-400 bg-amber-500/10', hex: '#F59E0B' },
+  indigo: { chip: 'text-accent bg-accent/10', hex: '#f97316' },
+  red: { chip: 'text-red-600 dark:text-red-400 bg-red-500/10', hex: '#EF4444' },
 }
 
 function mmss(minutes) {

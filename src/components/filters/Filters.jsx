@@ -6,6 +6,7 @@ import { useFleet } from '../../state/useFleetData'
 import { STATUS, STATUS_ORDER } from '../../config/constants'
 import Sheet from '../common/Sheet'
 import FilterBar from './FilterBar'
+import { selection, impactLight } from '../../native/haptics'
 
 // Filtros responsivos:
 //  - Escritorio (md+): la barra inline de siempre (FilterBar).
@@ -53,9 +54,12 @@ function MobileFilters() {
           />
         </div>
         <button
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            impactLight()
+            setOpen(true)
+          }}
           className={clsx(
-            'relative inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition',
+            'tappable relative inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2.5 text-sm font-medium transition',
             activeCount > 0
               ? 'border-accent/40 bg-accent/10 text-accent'
               : 'border-line bg-panel text-muted',
@@ -78,14 +82,20 @@ function MobileFilters() {
         footer={
           <div className="flex gap-2">
             <button
-              onClick={resetFilters}
-              className="flex-1 rounded-lg border border-line bg-inset py-2.5 text-sm font-medium text-muted transition active:bg-line"
+              onClick={() => {
+                impactLight()
+                resetFilters()
+              }}
+              className="tappable flex-1 rounded-xl border border-line bg-inset py-3 text-sm font-medium text-muted transition"
             >
               Limpiar
             </button>
             <button
-              onClick={() => setOpen(false)}
-              className="flex-[2] rounded-lg bg-accent py-2.5 text-sm font-semibold text-white transition active:opacity-90"
+              onClick={() => {
+                impactLight()
+                setOpen(false)
+              }}
+              className="tappable flex-[2] rounded-xl bg-accent py-3 text-sm font-semibold text-white shadow-elev-1 transition"
             >
               Ver resultados
             </button>
@@ -102,9 +112,12 @@ function MobileFilters() {
                 return (
                   <button
                     key={id}
-                    onClick={() => toggleStatusFilter(id)}
+                    onClick={() => {
+                      selection()
+                      toggleStatusFilter(id)
+                    }}
                     className={clsx(
-                      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition',
+                      'tappable inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition',
                       on ? `${s.bg} ${s.text} ${s.border}` : 'border-line text-faint',
                     )}
                   >

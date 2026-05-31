@@ -10,6 +10,7 @@ import EmptyState from '../common/EmptyState'
 import WhatsAppIcon from '../common/WhatsAppIcon'
 import RiderRow from './RiderRow'
 import BulkSendModal from '../whatsapp/BulkSendModal'
+import { impactMedium } from '../../native/haptics'
 
 const PAGE_SIZE = 10
 
@@ -92,8 +93,11 @@ export default function RidersTable() {
           <span className="text-sm font-medium text-fg">{selectedIds.size} seleccionados</span>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setBulkOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+              onClick={() => {
+                impactMedium()
+                setBulkOpen(true)
+              }}
+              className="tappable inline-flex items-center gap-1.5 rounded-lg bg-[#25D366] px-3 py-1.5 text-xs font-semibold text-white shadow-elev-1 transition hover:opacity-90"
             >
               <WhatsAppIcon className="h-3.5 w-3.5" /> Enviar WhatsApp a seleccionados
             </button>
@@ -117,7 +121,7 @@ export default function RidersTable() {
                 type="checkbox"
                 checked={pageAllSelected}
                 onChange={(e) => selectMany(pageRows.map((r) => r.id), e.target.checked)}
-                className="h-4 w-4 cursor-pointer accent-orange-500"
+                className="h-4 w-4 cursor-pointer accent-accent"
                 aria-label="Seleccionar página"
               />
             </th>
@@ -142,11 +146,12 @@ export default function RidersTable() {
           </tr>
         </thead>
         <tbody>
-          {pageRows.map((rider) => (
+          {pageRows.map((rider, i) => (
             <RiderRow
               key={rider.id}
               rider={rider}
               now={now}
+              index={i}
               selected={rider.id === selectedRiderId}
               onSelect={selectRider}
             />
@@ -170,7 +175,7 @@ export default function RidersTable() {
             <button
               onClick={() => setPage(Math.max(0, safePage - 1))}
               disabled={safePage === 0}
-              className="rounded-md p-1.5 text-muted transition hover:bg-inset hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+              className="tappable rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Página anterior"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -181,7 +186,7 @@ export default function RidersTable() {
             <button
               onClick={() => setPage(Math.min(pageCount - 1, safePage + 1))}
               disabled={safePage >= pageCount - 1}
-              className="rounded-md p-1.5 text-muted transition hover:bg-inset hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
+              className="tappable rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Página siguiente"
             >
               <ChevronRight className="h-4 w-4" />

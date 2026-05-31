@@ -6,8 +6,9 @@ import WhatsAppIcon from '../common/WhatsAppIcon'
 import { useWhatsApp } from '../../state/whatsapp'
 import { waLink, buildMessage } from '../../utils/whatsapp'
 import { formatRouteTime, formatRelative } from '../../utils/time'
+import { impactLight, selection } from '../../native/haptics'
 
-export default function RiderRow({ rider, now, selected, onSelect }) {
+export default function RiderRow({ rider, now, selected, onSelect, index = 0 }) {
   const { settings, logSent, selectedIds, toggleSelect } = useWhatsApp()
   const checked = selectedIds.has(rider.id)
 
@@ -29,19 +30,25 @@ export default function RiderRow({ rider, now, selected, onSelect }) {
 
   return (
     <tr
-      onClick={() => onSelect(rider.id)}
+      onClick={() => {
+        selection()
+        onSelect(rider.id)
+      }}
       className={clsx(
-        'cursor-pointer border-b border-line transition-colors',
+        'cursor-pointer border-b border-line transition-colors active:bg-inset',
+        // Stagger de entrada solo en las primeras filas (mola, no marea).
+        index < 8 && 'animate-rise-in',
         selected ? 'bg-accent/10' : 'hover:bg-inset',
         flash && 'animate-row-flash',
       )}
+      style={index < 8 ? { animationDelay: `${index * 28}ms` } : undefined}
     >
       <td className="w-9 px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={checked}
           onChange={() => toggleSelect(rider.id)}
-          className="h-4 w-4 cursor-pointer accent-orange-500"
+          className="h-4 w-4 cursor-pointer accent-accent"
           aria-label={`Seleccionar ${rider.name}`}
         />
       </td>
@@ -85,9 +92,10 @@ export default function RiderRow({ rider, now, selected, onSelect }) {
           <button
             onClick={(e) => {
               e.stopPropagation()
+              selection()
               onSelect(rider.id)
             }}
-            className="rounded-md p-1.5 text-muted transition hover:bg-inset hover:text-fg"
+            className="tappable rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-fg"
             title="Ver detalle"
             aria-label="Ver detalle"
           >
@@ -101,6 +109,7 @@ export default function RiderRow({ rider, now, selected, onSelect }) {
               rel="noreferrer"
               onClick={(e) => {
                 e.stopPropagation()
+                impactLight()
                 logSent({
                   riderId: rider.id,
                   riderName: rider.name,
@@ -110,7 +119,7 @@ export default function RiderRow({ rider, now, selected, onSelect }) {
                   channel: 'wa.me',
                 })
               }}
-              className="rounded-md p-1.5 text-[#25D366] transition hover:bg-inset hover:opacity-80"
+              className="tappable rounded-lg p-1.5 text-[#25D366] transition hover:bg-inset hover:opacity-80"
               title={`WhatsApp · ${rider.phone}`}
               aria-label="WhatsApp"
             >
@@ -127,8 +136,11 @@ export default function RiderRow({ rider, now, selected, onSelect }) {
 
           <a
             href={`tel:${(rider.phone ?? '').replace(/\s/g, '')}`}
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-md p-1.5 text-muted transition hover:bg-inset hover:text-emerald-500 dark:hover:text-emerald-400"
+            onClick={(e) => {
+              e.stopPropagation()
+              impactLight()
+            }}
+            className="tappable rounded-lg p-1.5 text-muted transition hover:bg-inset hover:text-green-500 dark:hover:text-green-400"
             title={`Llamar · ${rider.phone ?? ''}`}
             aria-label="Llamar"
           >

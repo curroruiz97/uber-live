@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import CountUp from '../common/CountUp'
 import Sparkline from '../common/Sparkline'
@@ -40,22 +41,40 @@ function DeltaChip({ delta }) {
 
 export default function KpiCard({ label, value, decimals = 0, suffix, format, icon: Icon, accent = 'indigo', history, delta, hint }) {
   const a = ACCENTS[accent] ?? ACCENTS.indigo
+
+  // Pulso de dato vivo: al cambiar el valor, la cifra late con un resorte breve.
+  const [popping, setPopping] = useState(false)
+  const prev = useRef(value)
+  useEffect(() => {
+    if (prev.current !== value) {
+      prev.current = value
+      setPopping(true)
+    }
+  }, [value])
+
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-line bg-panel p-4 shadow-soft transition hover:border-accent/40">
+    <div className="group relative overflow-hidden rounded-2xl border border-line bg-panel p-4 shadow-elev-1 transition-colors duration-200 hover:border-line-strong">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted">{label}</span>
+        <span className="truncate text-[11px] font-medium uppercase tracking-wide text-faint">{label}</span>
         {Icon && (
-          <span className={clsx('flex h-7 w-7 items-center justify-center rounded-lg', a.chip)}>
+          <span className={clsx('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', a.chip)}>
             <Icon className="h-4 w-4" />
           </span>
         )}
       </div>
-      <div className="mt-3 flex items-end justify-between gap-2">
-        <div className="flex min-w-0 items-baseline gap-1.5">
+      <div className="mt-2.5 flex items-end justify-between gap-2">
+        <div
+          className={clsx('flex min-w-0 origin-left items-baseline gap-1.5', popping && 'animate-pop')}
+          onAnimationEnd={() => setPopping(false)}
+        >
           {format === 'mmss' ? (
-            <span className="font-mono text-xl font-semibold tabular-nums text-fg sm:text-2xl">{mmss(value)}</span>
+            <span className="text-2xl font-bold tabular-nums tracking-tight text-fg sm:text-[28px]">{mmss(value)}</span>
           ) : (
-            <CountUp value={value} decimals={decimals} className="text-xl font-semibold tabular-nums text-fg sm:text-2xl" />
+            <CountUp
+              value={value}
+              decimals={decimals}
+              className="text-2xl font-bold tabular-nums tracking-tight text-fg sm:text-[28px]"
+            />
           )}
           {suffix && <span className="text-sm text-faint">{suffix}</span>}
           <DeltaChip delta={delta} />

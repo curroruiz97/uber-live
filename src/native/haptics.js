@@ -51,3 +51,21 @@ export async function notifyWarning() {
     /* ignore */
   }
 }
+
+export async function success() {
+  const m = await mod()
+  try {
+    await m?.Haptics?.notification({ type: m.NotificationType?.Success ?? 'SUCCESS' })
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function error() {
+  const m = await mod()
+  try {
+    await m?.Haptics?.notification({ type: m.NotificationType?.Error ?? 'ERROR' })
+  } catch {
+    /* ignore */
+  }
+}

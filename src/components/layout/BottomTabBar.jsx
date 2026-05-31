@@ -52,14 +52,24 @@ export default function BottomTabBar() {
               onClick={() => go(tab)}
               aria-current={on ? 'page' : undefined}
               className={clsx(
-                'flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[10px] font-medium transition',
-                on ? 'text-accent' : 'text-faint active:text-muted',
+                'tappable relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[10px] font-medium transition-colors duration-200',
+                on ? 'text-accent' : 'text-faint',
               )}
             >
+              {/* Indicador superior animado de la pestaña activa. */}
+              <span
+                className={clsx(
+                  'absolute left-1/2 top-0 h-0.5 -translate-x-1/2 rounded-full bg-accent transition-all duration-300 ease-spring',
+                  on ? 'w-8 opacity-100' : 'w-0 opacity-0',
+                )}
+              />
               <span className="relative">
-                <Icon className={clsx('h-[22px] w-[22px]', on && 'text-accent')} strokeWidth={on ? 2.4 : 2} />
+                <Icon
+                  className={clsx('h-[22px] w-[22px] transition-transform duration-300 ease-spring', on && 'text-accent')}
+                  strokeWidth={on ? 2.4 : 2}
+                />
                 {showBadge && (
-                  <span className="absolute -right-2 -top-1.5 min-w-[16px] rounded-full bg-accent px-1 text-center text-[9px] font-bold leading-4 text-white">
+                  <span className="absolute -right-2 -top-1.5 min-w-[16px] animate-pop rounded-full bg-accent px-1 text-center text-[9px] font-bold leading-4 text-white">
                     {msgBadge > 99 ? '99+' : msgBadge}
                   </span>
                 )}

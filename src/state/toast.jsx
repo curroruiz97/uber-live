@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useState } from 'react'
 import clsx from 'clsx'
 import { X, CheckCircle2, AlertTriangle, Info } from 'lucide-react'
+import { success as hSuccess, error as hError, notifyWarning } from '../native/haptics'
 
 const ToastContext = createContext(null)
 
@@ -29,7 +30,12 @@ export function ToastProvider({ children }) {
     (opts) => {
       seq += 1
       const id = seq
-      setToasts((prev) => [...prev, { id, type: opts.type || 'info', ...opts }].slice(-4))
+      const type = opts.type || 'info'
+      // Feedback háptico acorde al tipo (no-op en web).
+      if (type === 'success') hSuccess()
+      else if (type === 'error') hError()
+      else if (type === 'warning') notifyWarning()
+      setToasts((prev) => [...prev, { id, type, ...opts }].slice(-4))
       window.setTimeout(() => remove(id), opts.duration ?? 5000)
       return id
     },
@@ -45,7 +51,7 @@ export function ToastProvider({ children }) {
           return (
             <div
               key={t.id}
-              className="pointer-events-auto flex animate-scale-in items-start gap-3 rounded-xl border border-line bg-panel p-3 shadow-soft"
+              className="pointer-events-auto flex animate-toast-in items-start gap-3 rounded-2xl border border-line-strong bg-elevated/95 p-3.5 shadow-elev-3 backdrop-blur-xl"
             >
               <Icon className={clsx('mt-0.5 h-4 w-4 shrink-0', TONES[t.type])} />
               <div className="min-w-0 flex-1">

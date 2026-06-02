@@ -61,6 +61,7 @@ function Content({ activeNav }) {
   if (activeNav === 'riders') {
     return (
       <div className="space-y-4">
+        <FleetProviderSegmented />
         <KpiCards />
         <Filters />
         <RidersTable />

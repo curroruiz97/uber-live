@@ -1,16 +1,27 @@
 import clsx from 'clsx'
-import { Car, Bike, Layers, AlertTriangle } from 'lucide-react'
+import { Layers, AlertTriangle } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
 import { useFleet } from '../../state/useFleetData'
 import { selection } from '../../native/haptics'
+import UberIcon from '../common/UberIcon'
+import GlovoIcon from '../common/GlovoIcon'
 
 // Conmutador de proveedor de flota para el mapa: Uber | Glovo | Todos.
-// Mismo lenguaje visual que MessagesSegmented (grid bg-inset, activo bg-panel).
+// Ancho completo (3 columnas iguales), con los logos de marca para un look pro.
 // Cambiar de pestaña recarga toda la vista de flota (mapa + KPIs + tabla + feed).
+function AllLogo() {
+  return (
+    <span className="flex items-center -space-x-1.5">
+      <UberIcon className="h-5 w-5 rounded-md ring-1 ring-panel" />
+      <GlovoIcon className="h-5 w-5 rounded-md ring-1 ring-panel" />
+    </span>
+  )
+}
+
 const TABS = [
-  { id: 'uber', label: 'Uber', Icon: Car },
-  { id: 'glovo', label: 'Glovo', Icon: Bike },
-  { id: 'all', label: 'Todos', Icon: Layers },
+  { id: 'uber', label: 'Uber', renderLogo: () => <UberIcon className="h-5 w-5" /> },
+  { id: 'glovo', label: 'Glovo', renderLogo: () => <GlovoIcon className="h-5 w-5" /> },
+  { id: 'all', label: 'Todos', renderLogo: () => <AllLogo /> },
 ]
 
 export default function FleetProviderSegmented() {
@@ -24,8 +35,8 @@ export default function FleetProviderSegmented() {
 
   return (
     <div className="space-y-2">
-      <div className="inline-grid grid-cols-3 gap-1 rounded-xl bg-inset p-1">
-        {TABS.map(({ id, label, Icon }) => {
+      <div className="grid w-full grid-cols-3 gap-1.5 rounded-xl bg-inset p-1.5">
+        {TABS.map(({ id, label, renderLogo }) => {
           const on = activeProvider === id
           return (
             <button
@@ -38,12 +49,14 @@ export default function FleetProviderSegmented() {
               }}
               aria-pressed={on}
               className={clsx(
-                'flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition',
-                on ? 'bg-panel text-fg shadow-sm' : 'text-muted hover:text-fg',
+                'flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition',
+                on
+                  ? 'bg-panel text-fg shadow-sm ring-1 ring-line'
+                  : 'text-muted hover:bg-panel/50 hover:text-fg',
               )}
             >
-              <Icon className="h-4 w-4" />
-              {label}
+              {renderLogo()}
+              <span>{label}</span>
             </button>
           )
         })}

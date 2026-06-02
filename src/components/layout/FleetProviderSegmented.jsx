@@ -8,20 +8,11 @@ import GlovoIcon from '../common/GlovoIcon'
 
 // Conmutador de proveedor de flota para el mapa: Uber | Glovo | Todos.
 // Ancho completo (3 columnas iguales), con los logos de marca para un look pro.
-// Cambiar de pestaña recarga toda la vista de flota (mapa + KPIs + tabla + feed).
-function AllLogo() {
-  return (
-    <span className="flex items-center -space-x-1.5">
-      <UberIcon className="h-5 w-5 rounded-md ring-1 ring-panel" />
-      <GlovoIcon className="h-5 w-5 rounded-md ring-1 ring-panel" />
-    </span>
-  )
-}
-
+// "Todos" va solo con texto (sin iconos). Cambiar de pestaña recarga toda la vista.
 const TABS = [
   { id: 'uber', label: 'Uber', renderLogo: () => <UberIcon className="h-5 w-5" /> },
   { id: 'glovo', label: 'Glovo', renderLogo: () => <GlovoIcon className="h-5 w-5" /> },
-  { id: 'all', label: 'Todos', renderLogo: () => <AllLogo /> },
+  { id: 'all', label: 'Todos', renderLogo: null },
 ]
 
 export default function FleetProviderSegmented() {
@@ -55,7 +46,7 @@ export default function FleetProviderSegmented() {
                   : 'text-muted hover:bg-panel/50 hover:text-fg',
               )}
             >
-              {renderLogo()}
+              {renderLogo && renderLogo()}
               <span>{label}</span>
             </button>
           )

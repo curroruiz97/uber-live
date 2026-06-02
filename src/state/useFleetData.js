@@ -339,6 +339,13 @@ export function useFleetData(connection, provider = 'uber') {
     setLoading(true)
     setError(null)
     setEvents([])
+    // Limpia los datos visibles al cambiar de proveedor/conexión: si la nueva fuente
+    // falla o no está configurada (p. ej. Glovo sin credenciales), NO debe quedarse
+    // mostrando los riders/KPIs del proveedor anterior.
+    setSnapshot({ riders: [], deliveries: [] })
+    setKpis(EMPTY_KPIS)
+    setKpiHistory({})
+    setLastUpdated(null)
     accRef.current = { completedCount: 0, durSum: 0, durCount: 0 }
     seenRef.current = { active: new Set(), terminal: new Set() }
     prevDeliveriesRef.current = []

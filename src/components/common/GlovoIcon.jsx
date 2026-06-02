@@ -1,20 +1,13 @@
-// Badge de marca de Glovo (lucide-react no trae iconos de marca). Tile amarillo
-// de marca (#FFC244) con la "G" en verde Glovo (#00A082). Tamaño vía className.
+// Logo oficial de Glovo (pin vectorial exacto, fuente: Simple Icons) sobre un tile
+// amarillo de marca (#FFC244), con el pin en verde Glovo (#00A082). Colores de marca
+// fijos (no cambian con el tema). Tamaño vía className.
 export default function GlovoIcon({ className }) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-label="Glovo" role="img">
       <rect x="0.5" y="0.5" width="23" height="23" rx="6" fill="#FFC244" stroke="#000000" strokeOpacity="0.08" />
-      <text
-        x="12"
-        y="17"
-        textAnchor="middle"
-        fontFamily="Inter, Helvetica, Arial, sans-serif"
-        fontSize="13"
-        fontWeight="800"
-        fill="#00A082"
-      >
-        G
-      </text>
+      <g transform="translate(4.2 3.2) scale(0.65)" fill="#00A082">
+        <path d="M12.012 0C7.847 0 4.459 3.388 4.459 7.553c0 1.576.494 3.106 1.412 4.4l.211.281 3.93 5.555s.47.775 1.529.775h.941c1.036 0 1.53-.775 1.53-.775l3.93-5.555.187-.28a7.43 7.43 0 0 0 1.412-4.401C19.564 3.388 16.176 0 12.011 0Zm0 3.693a3.837 3.837 0 0 1 3.836 3.836c0 .824-.26 1.578-.73 2.237l-.212.28-2.894 4.095-2.895-4.07-.21-.305a3.848 3.848 0 0 1-.731-2.237 3.837 3.837 0 0 1 3.836-3.836zm-2.117 18.26c0 1.106.893 2.023 2.07 2.047 1.223 0 2.117-.917 2.117-2.059 0-1.14-.894-2.058-2.094-2.058-1.2 0-2.093.917-2.093 2.07z" />
+      </g>
     </svg>
   )
 }

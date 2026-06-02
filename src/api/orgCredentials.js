@@ -18,4 +18,6 @@ export const orgCredentials = {
   saveMensatek: (p) => post('/mensatek', p),
   // p = { phone_number_id, business_account_id, token }
   saveWhatsApp: (p) => post('/whatsapp', p),
+  // p = { client_id, kid, company_id, city_codes, environment, private_key }
+  saveGlovo: (p) => post('/glovo', p),
 }

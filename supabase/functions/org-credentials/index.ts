@@ -124,6 +124,37 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, configured: integ.whatsapp_configured })
     }
 
+    if (path === '/glovo') {
+      // Glovo Live Ops. La clave privada RSA es el secreto; client_id, kid, company id,
+      // city codes y entorno son config no secreta.
+      const clientId = String(body.client_id ?? '').trim()
+      const kid = String(body.kid ?? '').trim()
+      const companyId = String(body.company_id ?? '').trim()
+      const cityCodes = String(body.city_codes ?? '').trim()
+      const environment = body.environment === 'production' ? 'production' : 'staging'
+      const privateKey = String(body.private_key ?? '').trim()
+
+      await ensureRow(admin, 'org_secrets', orgId)
+      await ensureRow(admin, 'org_integrations', orgId)
+
+      const integ: any = {
+        glovo_client_id: clientId,
+        glovo_kid: kid,
+        glovo_company_id: companyId,
+        glovo_city_codes: cityCodes,
+        glovo_environment: environment,
+        updated_at: now,
+      }
+      if (privateKey) {
+        await admin.from('org_secrets').update({ glovo_private_key: privateKey, updated_at: now }).eq('org_id', orgId)
+        integ.glovo_last4 = last4(privateKey)
+      }
+      const { data: sec } = await admin.from('org_secrets').select('glovo_private_key').eq('org_id', orgId).maybeSingle()
+      integ.glovo_configured = Boolean(clientId && companyId && cityCodes && sec?.glovo_private_key)
+      await admin.from('org_integrations').update(integ).eq('org_id', orgId)
+      return json(200, { ok: true, configured: integ.glovo_configured })
+    }
+
     return json(404, { error: 'not_found', message: `Ruta no soportada: ${path}` })
   } catch (e: any) {
     return json(500, { error: 'save_error', message: e.message })

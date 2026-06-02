@@ -47,7 +47,12 @@ export default function RiderMarker({ rider, selected, onSelect }) {
               → {rider.currentDelivery.dropoffAddress || 'Viaje en curso'}
             </p>
           )}
-          {rider.zone && <p className="mt-1 text-[11px] text-faint">{rider.zone.label}</p>}
+          {rider.zone && (
+            <p className="mt-1 text-[11px] text-faint">
+              {rider.zone.label}
+              {rider.provider ? ` · ${rider.provider === 'glovo' ? 'Glovo' : 'Uber'}` : ''}
+            </p>
+          )}
           {rider.phone ? (
             <a
               href={waLink(rider.phone, waMsg)}

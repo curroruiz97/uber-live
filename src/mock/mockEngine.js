@@ -5,6 +5,7 @@ import { zoneForLocation } from '../config/constants'
 function publicRider(r) {
   return {
     id: r.id,
+    provider: r.provider,
     name: r.name,
     phone: r.phone,
     email: r.email,
@@ -161,9 +162,9 @@ function advance(fleet, state) {
 // Fuente de datos del modo demo. Misma interfaz que la fuente real:
 //   start() -> { riders, deliveries, meta, baselineKpis }
 //   poll()  -> { riders, deliveries, meta }
-export function createMockSource() {
-  const fleet = buildInitialFleet()
-  const state = { openIncidents: 2 }
+export function createMockSource(provider = 'uber') {
+  const fleet = buildInitialFleet(provider)
+  const state = { openIncidents: provider === 'glovo' ? 1 : 2 }
   return {
     mode: 'demo',
     start() {

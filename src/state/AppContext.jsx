@@ -3,6 +3,10 @@ import { STATUS_ORDER } from '../config/constants'
 
 const CONN_KEY = 'ul-connection'
 const NAV_KEY = 'ul-nav'
+const PROVIDER_KEY = 'ul-provider'
+
+// Proveedores de flota disponibles para el switcher del mapa.
+export const PROVIDERS = ['uber', 'glovo', 'all']
 
 const AppContext = createContext(null)
 
@@ -51,6 +55,17 @@ export function AppProvider({ children }) {
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [selectedRiderId, setSelectedRiderId] = useState(null)
 
+  // Proveedor de flota activo en el mapa (uber | glovo | all). Persistido para
+  // sobrevivir a recargas. Es la dimensión que alimenta useFleetData.
+  const [activeProvider, setActiveProviderState] = useState(() => {
+    try {
+      const p = localStorage.getItem(PROVIDER_KEY)
+      return PROVIDERS.includes(p) ? p : 'uber'
+    } catch {
+      return 'uber'
+    }
+  })
+
   // Persistir conexión (sin token) y sección activa.
   useEffect(() => {
     try {
@@ -72,6 +87,24 @@ export function AppProvider({ children }) {
     }
   }, [activeNav])
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(PROVIDER_KEY, activeProvider)
+    } catch {
+      /* ignore */
+    }
+  }, [activeProvider])
+
+  // Cambiar de proveedor limpia la selección (el rider elegido puede no existir en
+  // la otra flota) para no dejar abierto un detalle inexistente.
+  const setActiveProvider = useCallback((p) => {
+    if (!PROVIDERS.includes(p)) return
+    setActiveProviderState((prev) => {
+      if (prev !== p) setSelectedRiderId(null)
+      return p
+    })
+  }, [])
+
   const connectDemo = useCallback(() => {
     setConnection({ token: '', environment: 'sandbox', demoMode: true, connected: true })
   }, [])
@@ -85,6 +118,7 @@ export function AppProvider({ children }) {
     setFilters(DEFAULT_FILTERS)
     setSelectedRiderId(null)
     setActiveNav('dashboard')
+    setActiveProviderState('uber')
   }, [])
 
   const toggleSidebar = useCallback(() => setSidebarCollapsed((v) => !v), [])
@@ -114,6 +148,8 @@ export function AppProvider({ children }) {
       toggleSidebar,
       activeNav,
       setActiveNav,
+      activeProvider,
+      setActiveProvider,
       filters,
       toggleStatusFilter,
       setZoneFilter,
@@ -131,6 +167,8 @@ export function AppProvider({ children }) {
       sidebarCollapsed,
       toggleSidebar,
       activeNav,
+      activeProvider,
+      setActiveProvider,
       filters,
       toggleStatusFilter,
       setZoneFilter,

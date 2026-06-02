@@ -31,9 +31,18 @@ const PICKUPS = [
 const STREETS = {
   Valladolid: ['Calle Santiago', 'Paseo Zorrilla', 'Calle Mantería', 'Plaza Mayor', 'Calle Gamazo', 'Av. de Salamanca', 'Calle Doctrinos'],
   Madrid: ['Gran Vía', 'Calle de Alcalá', 'Paseo de la Castellana', 'Calle Goya', 'Calle de Atocha', 'Calle Fuencarral', 'Calle de Serrano'],
+  Barcelona: ['Passeig de Gràcia', 'Carrer de Balmes', 'La Rambla', 'Avinguda Diagonal', 'Carrer de Sants', 'Gran de Gràcia'],
+  Valencia: ['Carrer de Colón', 'Av. del Regne de València', 'Carrer de Russafa', 'Gran Via Marquès del Túria', 'Carrer de Xàtiva'],
 }
 
 const RIDER_COUNT = 26
+
+// Ciudades por proveedor en demo: Uber en Valladolid+Madrid, Glovo en Barcelona+Valencia.
+// Así el switcher muestra flotas claramente distintas sin datos reales.
+const PROVIDER_CITIES = {
+  uber: ['Valladolid', 'Madrid'],
+  glovo: ['Barcelona', 'Valencia'],
+}
 
 export function pick(arr, rnd = Math.random) {
   return arr[Math.floor(rnd() * arr.length)]
@@ -114,22 +123,26 @@ export function makeDelivery(rider, now, phase = 'to_pickup', rnd = Math.random)
   }
 }
 
-// Construye la flota inicial (~26 riders) repartida entre Valladolid y Madrid.
-export function buildInitialFleet() {
-  const rnd = mulberry32(20260522)
+// Construye la flota inicial (~26 riders). provider decide las ciudades y etiqueta
+// cada rider con su origen ('uber' | 'glovo'), para que el switcher muestre flotas
+// distintas en demo. La semilla varía por proveedor para que no sean idénticas.
+export function buildInitialFleet(provider = 'uber') {
+  const cities = PROVIDER_CITIES[provider] || PROVIDER_CITIES.uber
+  const rnd = mulberry32(provider === 'glovo' ? 20260601 : 20260522)
   const now = Date.now()
   const fleet = []
 
   for (let i = 0; i < RIDER_COUNT; i += 1) {
-    // Reparte: ~40% Valladolid, ~60% Madrid
-    const city = rnd() < 0.4 ? 'Valladolid' : 'Madrid'
+    // Reparte ~40% primera ciudad, ~60% segunda.
+    const city = rnd() < 0.4 ? cities[0] : cities[1]
     const cityZones = ZONES.filter((z) => z.city === city)
     const zone = pick(cityZones, rnd)
 
     const name = NAMES[i % NAMES.length]
     const vehicleType = pick(VEHICLES, rnd)
     const rider = {
-      id: `rider-${i + 1}`,
+      id: `${provider}-rider-${i + 1}`,
+      provider,
       name,
       phone: phone(rnd),
       email: email(name, rnd),

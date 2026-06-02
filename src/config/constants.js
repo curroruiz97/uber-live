@@ -67,7 +67,9 @@ export const EVENT_TYPES = {
   cancellation: { id: 'cancellation', label: 'Cancelación', text: 'text-red-600 dark:text-red-400', dot: 'bg-red-500' },
 }
 
-// Zonas operativas (Valladolid y Madrid). center se usa para asignar zona por cercanía.
+// Zonas operativas. center se usa para asignar zona por cercanía.
+// Uber opera en Valladolid y Madrid; Glovo (demo) añade Barcelona y Valencia para
+// que la flota se vea distinta. En producción la zona real la fija cada API.
 export const ZONES = [
   { id: 'vll_centro', label: 'Valladolid · Centro', city: 'Valladolid', center: { lat: 41.6529, lng: -4.7286 } },
   { id: 'vll_oeste', label: 'Valladolid · Parquesol', city: 'Valladolid', center: { lat: 41.645, lng: -4.765 } },
@@ -75,6 +77,10 @@ export const ZONES = [
   { id: 'mad_centro', label: 'Madrid · Centro', city: 'Madrid', center: { lat: 40.4168, lng: -3.7038 } },
   { id: 'mad_norte', label: 'Madrid · Chamberí', city: 'Madrid', center: { lat: 40.4357, lng: -3.7006 } },
   { id: 'mad_este', label: 'Madrid · Salamanca', city: 'Madrid', center: { lat: 40.4302, lng: -3.6795 } },
+  { id: 'bcn_centro', label: 'Barcelona · Eixample', city: 'Barcelona', center: { lat: 41.3874, lng: 2.1686 } },
+  { id: 'bcn_gracia', label: 'Barcelona · Gràcia', city: 'Barcelona', center: { lat: 41.4036, lng: 2.1561 } },
+  { id: 'vlc_centro', label: 'Valencia · Ciutat Vella', city: 'Valencia', center: { lat: 39.4753, lng: -0.3756 } },
+  { id: 'vlc_ruzafa', label: 'Valencia · Ruzafa', city: 'Valencia', center: { lat: 39.4585, lng: -0.3729 } },
 ]
 
 // Devuelve la zona más cercana a una coordenada (distancia euclídea, suficiente a escala urbana).

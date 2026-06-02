@@ -7,6 +7,7 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import BottomTabBar from './BottomTabBar'
 import MessagesSegmented from './MessagesSegmented'
+import FleetProviderSegmented from './FleetProviderSegmented'
 import KpiCards from '../kpis/KpiCards'
 import FleetMap from '../map/FleetMap'
 import Filters from '../filters/Filters'
@@ -22,7 +23,6 @@ import MensatekView from '../mensatek/MensatekView'
 import SettingsLayout from '../settings/SettingsLayout'
 import TrialBanner from '../billing/TrialBanner'
 import { useNativeBackToDashboard } from '../../native/useNativeBack'
-import { useNativePush } from '../../native/useNativePush'
 
 function LoadingState() {
   return (
@@ -71,6 +71,7 @@ function Content({ activeNav }) {
   if (activeNav === 'mapa') {
     return (
       <div className="space-y-4">
+        <FleetProviderSegmented />
         <KpiCards />
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
           <div className="min-w-0 space-y-3">
@@ -85,6 +86,7 @@ function Content({ activeNav }) {
 
   return (
     <div className="space-y-4">
+      <FleetProviderSegmented />
       <KpiCards />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-4">
@@ -101,19 +103,21 @@ function Content({ activeNav }) {
 export default function DashboardLayout() {
   const app = useApp()
   const { selectedRiderId, clearSelection } = app
-  const fleet = useFleetData({
-    demoMode: app.demoMode,
-    token: app.token,
-    environment: app.environment,
-    connected: app.connected,
-  })
+  const fleet = useFleetData(
+    {
+      demoMode: app.demoMode,
+      token: app.token,
+      environment: app.environment,
+      connected: app.connected,
+    },
+    app.activeProvider,
+  )
   const { toast } = useToast()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
 
-  // Puentes nativos: botón atrás → vuelve a Inicio; push notifications.
+  // Puente nativo: botón atrás → vuelve a Inicio.
   useNativeBackToDashboard()
-  useNativePush()
 
   // Atajos de teclado globales.
   useEffect(() => {

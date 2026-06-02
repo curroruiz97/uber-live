@@ -10,6 +10,9 @@ export const API_BASE = import.meta.env.VITE_API_BASE || ''
 // sustituye al backend Express en producción).
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 export const UBER_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/uber`
+// Proxy de Glovo (Live Operations API). La clave privada RSA vive en org_secrets;
+// la Edge Function firma el JWT, intercambia el token STS y lee la flota en vivo.
+export const GLOVO_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/glovo`
 // Proxy de Mensatek (SMS/Email certificado). El API Token vive en los secrets de la
 // Edge Function, nunca en el navegador.
 export const MENSATEK_FN_BASE = `${import.meta.env.VITE_SUPABASE_URL || ''}/functions/v1/mensatek`

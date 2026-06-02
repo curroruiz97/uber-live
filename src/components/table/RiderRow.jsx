@@ -4,14 +4,18 @@ import { Eye, Phone } from 'lucide-react'
 import StatusBadge from '../common/StatusBadge'
 import Avatar from '../common/Avatar'
 import WhatsAppIcon from '../common/WhatsAppIcon'
+import { useApp } from '../../state/AppContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import { waLink, buildMessage } from '../../utils/whatsapp'
 import { formatRouteTime, formatRelative } from '../../utils/time'
 import { impactLight, selection } from '../../native/haptics'
 
 export default function RiderRow({ rider, now, selected, onSelect, index = 0 }) {
+  const { activeProvider } = useApp()
   const { settings, logSent, selectedIds, toggleSelect } = useWhatsApp()
   const checked = selectedIds.has(rider.id)
+  // En la vista combinada ("Todos") mostramos de qué proveedor es cada rider.
+  const showProvider = activeProvider === 'all' && rider.provider
 
   const sig = `${rider.status}|${rider.currentDelivery?.id ?? ''}`
   const prevSig = useRef(sig)
@@ -44,7 +48,7 @@ export default function RiderRow({ rider, now, selected, onSelect, index = 0 }) 
       )}
       style={index < 8 ? { animationDelay: `${index * 28}ms` } : undefined}
     >
-      <td className="w-9 px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+      <td className="w-9 px-3 py-2" onClick={(e) => e.stopPropagation()}>
         <input
           type="checkbox"
           checked={checked}
@@ -54,21 +58,29 @@ export default function RiderRow({ rider, now, selected, onSelect, index = 0 }) 
         />
       </td>
 
-      <td className="whitespace-nowrap px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
+      <td className="px-3 py-2">
+        <div className="flex items-center gap-2">
           <Avatar name={rider.name} size="sm" />
           <div className="min-w-0">
-            <div className="truncate font-medium text-fg">{rider.name}</div>
-            <div className="text-xs text-faint">{rider.vehicleType}</div>
+            <div className="truncate text-sm font-medium text-fg">{rider.name}</div>
+            <div className="mt-0.5 flex items-center gap-2">
+              <StatusBadge status={rider.status} size="sm" />
+              <span className="text-[11px] text-faint">{rider.vehicleType}</span>
+              {showProvider && (
+                <span className="rounded-full bg-inset px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+                  {rider.provider === 'glovo' ? 'Glovo' : 'Uber'}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </td>
 
-      <td className="px-3 py-2.5">
+      <td className="hidden px-3 py-2 sm:table-cell">
         <StatusBadge status={rider.status} size="sm" />
       </td>
 
-      <td className="hidden max-w-[200px] px-3 py-2.5 sm:table-cell">
+      <td className="hidden max-w-[200px] px-3 py-2 sm:table-cell">
         {rider.currentDelivery ? (
           <div
             className="truncate text-sm text-muted"
@@ -82,18 +94,18 @@ export default function RiderRow({ rider, now, selected, onSelect, index = 0 }) 
         )}
       </td>
 
-      <td className="hidden whitespace-nowrap px-3 py-2.5 md:table-cell">
+      <td className="hidden whitespace-nowrap px-3 py-2 md:table-cell">
         <span className="font-mono text-sm tabular-nums text-muted">
           {rider.routeStartedAt ? formatRouteTime(rider.routeStartedAt, now) : '—'}
         </span>
       </td>
 
-      <td className="hidden whitespace-nowrap px-3 py-2.5 lg:table-cell">
+      <td className="hidden whitespace-nowrap px-3 py-2 lg:table-cell">
         <div className="text-sm text-muted">{rider.zone?.label ?? '—'}</div>
         <div className="text-xs text-faint">{formatRelative(rider.lastSeenAt, now)}</div>
       </td>
 
-      <td className="whitespace-nowrap px-3 py-2.5 text-right">
+      <td className="whitespace-nowrap px-3 py-2 text-right">
         <div className="flex items-center justify-end gap-1">
           <button
             onClick={(e) => {

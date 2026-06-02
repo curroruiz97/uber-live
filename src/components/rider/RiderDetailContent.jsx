@@ -1,8 +1,10 @@
 import clsx from 'clsx'
-import { Phone, MapPin, Package, Clock, Bike, Hash, Mail, Route } from 'lucide-react'
+import { Phone, MapPin, Package, Clock, Bike, Hash, Mail, Route, Building2 } from 'lucide-react'
 import MiniRouteMap from '../map/MiniRouteMap'
 import { formatRouteTime, formatRelative } from '../../utils/time'
 import { impactMedium } from '../../native/haptics'
+
+const PROVIDER_LABEL = { uber: 'Uber', glovo: 'Glovo' }
 
 // Contenido del detalle de rider, compartido por el drawer de escritorio y la hoja
 // inferior arrastrable de móvil. Solo presentación: no toca datos ni lógica.
@@ -41,6 +43,9 @@ export function RiderDetailBody({ rider, delivery, now }) {
       </Block>
 
       <Block i={1} className="space-y-3">
+        {rider.provider && (
+          <InfoRow icon={Building2} label="Plataforma" value={PROVIDER_LABEL[rider.provider] ?? rider.provider} />
+        )}
         <InfoRow icon={Bike} label="Vehículo" value={rider.vehicleType ?? '—'} />
         {rider.licensePlate && <InfoRow icon={Hash} label="Matrícula" value={rider.licensePlate} mono />}
         {typeof rider.tripsToday === 'number' && (
@@ -86,7 +91,8 @@ export function RiderDetailBody({ rider, delivery, now }) {
               <div className="mt-2 text-sm">
                 <p className="font-medium text-fg">Viaje en curso</p>
                 <p className="mt-0.5 text-xs text-faint">
-                  El detalle del pedido (recogida/entrega) no lo expone la API de flotas de Uber.
+                  El detalle del pedido (recogida/entrega) no lo expone la API de flotas
+                  {rider.provider === 'glovo' ? ' de Glovo' : rider.provider === 'uber' ? ' de Uber' : ''}.
                 </p>
               </div>
             )}

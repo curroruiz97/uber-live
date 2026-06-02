@@ -15,3 +15,12 @@ dist-ssr
 # Herramientas locales de Claude (config de preview, planes, etc.)
 .claude
 COMMIT_MSG.tmp
+
+# IDE
+.idea
+
+# Android signing keystores y secretos — NUNCA subir a git
+*.keystore
+*.jks
+android/local.properties
+android/key.properties

@@ -103,6 +103,7 @@ export function normalizeDeliveries(payload) {
 
     ridersById.set(d.courierId, {
       id: d.courierId,
+      provider: 'uber',
       name: d.courierName ?? `Courier ${d.courierId.slice(0, 6)}`,
       phone: d.courierPhone,
       vehicleType: d.vehicleType,
@@ -212,6 +213,7 @@ export function normalizeFleet(payload) {
     const onTrip = status === 'en_entrega' // DRIVER_STATUS_ONTRIP
     return {
       id: r.driverId,
+      provider: 'uber',
       name,
       phone: r.phone || null,
       email: r.email || null,
@@ -234,5 +236,66 @@ export function normalizeFleet(payload) {
     }
   })
   // metrics (de analytics) viajan en meta -> deriveKpis los usa directamente.
+  return { riders, deliveries: [], meta: payload?.metrics || {} }
+}
+
+// ============================================================================
+// Glovo Live Operations API: mapea riders en vivo -> modelo Rider.
+// A diferencia de Uber, Glovo SÍ expone GPS real (lat/lng) por rider, actualizado
+// cada ~5 min. La Edge Function `glovo` ya entrega los riders aplanados con este
+// shape (id, status, lat, lng, name, city, KPIs); aquí solo unificamos al modelo.
+// ============================================================================
+
+// Estados de Glovo Live Ops -> estados internos del rider.
+const GLOVO_STATUS_MAP = {
+  available: 'disponible',
+  ready: 'disponible',
+  working: 'en_entrega', // con pedido asignado/en curso
+  delivering: 'en_entrega',
+  busy: 'en_entrega',
+  late: 'en_ruta',
+  break: 'offline',
+  ending: 'offline',
+  offline: 'offline',
+}
+
+function mapGlovoStatus(raw) {
+  const key = String(raw ?? '').toLowerCase()
+  return GLOVO_STATUS_MAP[key] || 'disponible'
+}
+
+export function normalizeGlovoFleet(payload) {
+  const now = Date.now()
+  const list = payload?.riders || []
+  const riders = list.map((r) => {
+    const status = mapGlovoStatus(r.status)
+    const hasGps = typeof r.lat === 'number' && typeof r.lng === 'number'
+    const location = hasGps ? { lat: r.lat, lng: r.lng } : null
+    const onTrip = status === 'en_entrega' || status === 'en_ruta'
+    const name = String(r.name || '').trim() || `Rider ${String(r.id).slice(0, 6)}`
+    return {
+      id: `glovo-${r.id}`,
+      provider: 'glovo',
+      name,
+      phone: r.phone || null,
+      email: r.email || null,
+      vehicleType: r.vehicle || r.vehicleType || null,
+      licensePlate: null,
+      status,
+      location,
+      // Glovo da el nombre de ciudad/zona; si hay GPS, zoneForLocation afina; si no, usa el label crudo.
+      zone: location
+        ? zoneForLocation(location.lat, location.lng)
+        : { id: r.cityId ? `glovo_${r.cityId}` : 'glovo', label: r.city || r.zone || 'Glovo', city: r.city || '' },
+      currentDelivery: onTrip
+        ? { id: `${r.id}-trip`, status: 'en_viaje', pickupName: null, dropoffAddress: null, etaMin: null, live: true }
+        : null,
+      routeStartedAt: onTrip ? r.shiftStart || r.statusSince || null : null,
+      lastSeenAt: r.statusSince || r.lastSeenAt || now,
+      tripsToday: r.deliveries ?? r.tripsToday ?? 0,
+      // GPS REAL (no disperso). Esta es la ventaja de Glovo frente a Uber.
+      approxLocation: !hasGps,
+    }
+  })
   return { riders, deliveries: [], meta: payload?.metrics || {} }
 }

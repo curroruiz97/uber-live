@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { POLL_INTERVAL_MS } from '../config/constants'
 import { createMockSource } from '../mock/mockEngine'
 import { createUberClient } from '../api/uberClient'
-import { normalizeFleet } from '../api/normalize'
+import { createGlovoClient } from '../api/glovoClient'
+import { normalizeFleet, normalizeGlovoFleet } from '../api/normalize'
 
 export const FleetContext = createContext(null)
 
@@ -12,24 +13,73 @@ export function useFleet() {
   return ctx
 }
 
-// Fuente real: misma interfaz que la fuente demo (start/poll), pero contra Uber.
-function createRealSource(connection) {
+// Fuente real de un proveedor concreto. Misma interfaz que la demo (start/poll).
+// Uber -> Vehicle Solutions (normalizeFleet); Glovo -> Live Ops (normalizeGlovoFleet).
+function createProviderSource(connection, provider) {
+  if (provider === 'glovo') {
+    const client = createGlovoClient(connection)
+    return {
+      mode: 'real',
+      async start(signal) {
+        return { ...normalizeGlovoFleet(await client.getFleet(signal)), baselineKpis: { completedToday: 0, avgSumMin: 0, avgCountN: 0 } }
+      },
+      async poll(signal) {
+        return normalizeGlovoFleet(await client.getFleet(signal))
+      },
+    }
+  }
   const client = createUberClient(connection)
   return {
     mode: 'real',
     async start(signal) {
-      const payload = await client.getFleet(signal)
       // normalizeFleet ya incluye meta (métricas reales); no sobrescribir.
-      return {
-        ...normalizeFleet(payload),
-        baselineKpis: { completedToday: 0, avgSumMin: 0, avgCountN: 0 },
-      }
+      return { ...normalizeFleet(await client.getFleet(signal)), baselineKpis: { completedToday: 0, avgSumMin: 0, avgCountN: 0 } }
     },
     async poll(signal) {
-      const payload = await client.getFleet(signal)
-      return normalizeFleet(payload)
+      return normalizeFleet(await client.getFleet(signal))
     },
   }
+}
+
+// Combina varias fuentes en una sola flota (vista "Todos"). Hace los fetch en
+// paralelo y concatena riders/deliveries; las métricas se suman campo a campo.
+// Si una fuente falla (p. ej. Glovo sin configurar), se ignora y se muestra el resto.
+function mergeSnapshots(snaps) {
+  const ok = snaps.filter(Boolean)
+  const riders = ok.flatMap((s) => s.riders || [])
+  const deliveries = ok.flatMap((s) => s.deliveries || [])
+  const meta = {}
+  for (const s of ok) {
+    for (const [k, v] of Object.entries(s.meta || {})) {
+      if (typeof v === 'number') meta[k] = (meta[k] || 0) + v
+    }
+  }
+  return { riders, deliveries, meta }
+}
+
+function createCombinedSource(sources) {
+  async function gather(method, signal) {
+    const results = await Promise.all(
+      sources.map((s) => Promise.resolve(s[method](signal)).catch(() => null)),
+    )
+    return mergeSnapshots(results)
+  }
+  return {
+    mode: 'combined',
+    async start(signal) {
+      return { ...(await gather('start', signal)), baselineKpis: { completedToday: 0, avgSumMin: 0, avgCountN: 0 } }
+    },
+    poll(signal) {
+      return gather('poll', signal)
+    },
+  }
+}
+
+// Construye la fuente activa según demo/proveedor. 'all' fusiona uber + glovo.
+function buildSource(connection, provider) {
+  const make = (p) => (connection.demoMode ? createMockSource(p) : createProviderSource(connection, p))
+  if (provider === 'all') return createCombinedSource([make('uber'), make('glovo')])
+  return make(provider)
 }
 
 function makeEvent(type, d, now) {
@@ -185,7 +235,7 @@ function seedHistory(kpis) {
   return out
 }
 
-export function useFleetData(connection) {
+export function useFleetData(connection, provider = 'uber') {
   const { demoMode, token, environment, connected } = connection
 
   const [snapshot, setSnapshot] = useState({ riders: [], deliveries: [] })
@@ -298,9 +348,7 @@ export function useFleetData(connection) {
     historyRef.current = null
     setKpiDeltas(null)
 
-    const source = demoMode
-      ? createMockSource()
-      : createRealSource({ token, environment })
+    const source = buildSource({ demoMode, token, environment }, provider)
     sourceRef.current = source
 
     ;(async () => {
@@ -351,7 +399,7 @@ export function useFleetData(connection) {
       clearInterval(countdownTimer.current)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [connected, demoMode, token, environment, applySnapshot])
+  }, [connected, demoMode, token, environment, provider, applySnapshot])
 
   return {
     riders: snapshot.riders,

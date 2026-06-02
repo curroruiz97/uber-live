@@ -102,7 +102,7 @@ export default function Topbar({ onToggleMobile, onOpenPalette }) {
         <button
           onClick={disconnect}
           className="flex items-center gap-1.5 rounded-lg border border-line px-2 py-1.5 text-xs font-medium text-muted transition hover:bg-inset hover:text-fg sm:px-2.5"
-          title="Volver a la pantalla de conexión de Uber"
+          title="Volver a la pantalla de conexión"
         >
           <LogOut className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Desconectar</span>

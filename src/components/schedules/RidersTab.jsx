@@ -3,10 +3,12 @@ import clsx from 'clsx'
 import { Search, Users as UsersIcon, ChevronRight } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { buildRiderStats } from '../../domain/compliance'
-import { periodRange, inRange, periodLabel } from '../../utils/period'
+import { inRange } from '../../utils/period'
 import Sparkline from '../common/Sparkline'
 import EmptyState from '../common/EmptyState'
 import Segmented from './Segmented'
+import RangeControls from './RangeControls'
+import { usePeriodRange } from './usePeriodRange'
 import RiderDetailSheet from './RiderDetailSheet'
 import { STATUS_META, pctTone, pctHex } from './statusMeta'
 
@@ -14,6 +16,7 @@ const PERIODS = [
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
   { id: 'all', label: 'Histórico' },
+  { id: 'custom', label: 'Fechas' },
 ]
 const SORTS = [
   { id: 'compliance', label: '% cumpl.' },
@@ -27,7 +30,7 @@ function initials(name) {
 
 export default function RidersTab() {
   const { daily, roster, loading } = useSchedules()
-  const [period, setPeriod] = useState('month')
+  const ctl = usePeriodRange('month')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('compliance')
   const [sel, setSel] = useState(null)
@@ -39,10 +42,9 @@ export default function RidersTab() {
   }, [roster])
 
   const rows = useMemo(() => {
-    if (period === 'all') return daily
-    const { from, to } = periodRange(period)
+    const { from, to } = ctl.range
     return daily.filter((d) => inRange(d.date, from, to))
-  }, [daily, period])
+  }, [daily, ctl.range])
 
   const stats = useMemo(() => {
     let s = buildRiderStats(rows, metaByKey)
@@ -59,22 +61,22 @@ export default function RidersTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:max-w-xs">
+      <div className="space-y-2">
+        <div className="relative w-full">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Buscar rider…"
-            className="w-full rounded-lg border border-line bg-inset py-2 pl-8 pr-2 text-xs text-fg placeholder-faint outline-none transition focus:border-accent/60"
+            className="w-full rounded-lg border border-line bg-inset py-2 pl-8 pr-2 text-sm text-fg placeholder-faint outline-none transition focus:border-accent/60"
           />
         </div>
-        <Segmented options={PERIODS} value={period} onChange={setPeriod} />
-        <Segmented options={SORTS} value={sort} onChange={setSort} />
-      </div>
-      <div className="flex items-center justify-between text-xs text-faint">
-        <span className="tabular-nums">{stats.length} riders</span>
-        <span>{period === 'all' ? 'histórico completo' : periodLabel(period)}</span>
+        <RangeControls ctl={ctl} presets={PERIODS} />
+        <Segmented options={SORTS} value={sort} onChange={setSort} fullWidth />
+        <div className="flex items-center justify-between text-xs text-faint">
+          <span className="tabular-nums">{stats.length} riders</span>
+          <span>{ctl.label}</span>
+        </div>
       </div>
 
       {stats.length === 0 ? (

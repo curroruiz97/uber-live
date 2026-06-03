@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { CheckCircle2, Clock, UserX, Timer, Users as UsersIcon, TimerReset, TrendingUp, PieChart, Trophy, AlertTriangle } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { aggregateCompliance, buildRanking, statusBreakdown, trendByDate } from '../../domain/compliance'
-import { periodRange, inRange, periodLabel } from '../../utils/period'
+import { inRange } from '../../utils/period'
 import KpiCard from '../kpis/KpiCard'
 import EmptyState from '../common/EmptyState'
 import TrendChart from './TrendChart'
@@ -11,26 +11,21 @@ import StatusDonut from './StatusDonut'
 import Podium from './Podium'
 import Segmented from './Segmented'
 import SectionCard from './SectionCard'
+import RangeControls from './RangeControls'
+import { usePeriodRange, previousWindow } from './usePeriodRange'
 import { pctTone, pctHex } from './statusMeta'
 
 const PERIODS = [
   { id: 'day', label: 'Día' },
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
+  { id: 'custom', label: 'Fechas' },
 ]
 const PROVIDERS = [
   { id: 'all', label: 'Todos' },
   { id: 'uber', label: 'Uber' },
   { id: 'glovo', label: 'Glovo' },
 ]
-
-// Rango del periodo inmediatamente anterior (para deltas).
-function prevRange(period, from) {
-  const [y, m, d] = from.split('-').map(Number)
-  const ref = new Date(y, m - 1, d)
-  ref.setDate(ref.getDate() - 1)
-  return periodRange(period, ref)
-}
 
 function ProviderSplit({ split }) {
   const rows = [
@@ -76,7 +71,7 @@ function WorstRow({ r }) {
 
 export default function SummaryTab() {
   const { daily, roster, cfg, loading } = useSchedules()
-  const [period, setPeriod] = useState('week')
+  const ctl = usePeriodRange('week')
   const [provider, setProvider] = useState('all')
 
   const metaByKey = useMemo(() => {
@@ -94,7 +89,7 @@ export default function SummaryTab() {
     [daily, metaByKey],
   )
 
-  const { from, to } = useMemo(() => periodRange(period), [period])
+  const { from, to } = ctl.range
   const inPeriod = useMemo(() => enriched.filter((d) => inRange(d.date, from, to)), [enriched, from, to])
   const rows = useMemo(() => (provider === 'all' ? inPeriod : inPeriod.filter((d) => d.provider === provider)), [inPeriod, provider])
 
@@ -104,10 +99,10 @@ export default function SummaryTab() {
   const ranking = useMemo(() => buildRanking(rows), [rows])
 
   const prev = useMemo(() => {
-    const pr = prevRange(period, from)
+    const pr = previousWindow(ctl.range)
     const pRows = enriched.filter((d) => inRange(d.date, pr.from, pr.to) && (provider === 'all' || d.provider === provider))
     return aggregateCompliance(pRows)
-  }, [enriched, period, from, provider])
+  }, [enriched, ctl.range, provider])
 
   const split = useMemo(() => {
     const out = {}
@@ -124,12 +119,10 @@ export default function SummaryTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Segmented options={PERIODS} value={period} onChange={setPeriod} />
-          <Segmented options={PROVIDERS} value={provider} onChange={setProvider} />
-        </div>
-        <span className="text-xs text-faint">{periodLabel(period)}</span>
+      <div className="space-y-2">
+        <RangeControls ctl={ctl} presets={PERIODS} />
+        <Segmented options={PROVIDERS} value={provider} onChange={setProvider} fullWidth />
+        <p className="text-right text-xs text-faint">{ctl.label}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">

@@ -1,20 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import clsx from 'clsx'
 import { Trophy, Download } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { buildRanking } from '../../domain/compliance'
-import { periodRange, inRange, periodLabel, fmtMinutes } from '../../utils/period'
+import { inRange, fmtMinutes } from '../../utils/period'
 import { downloadCsv } from '../../utils/csv'
 import EmptyState from '../common/EmptyState'
-import Segmented from './Segmented'
 import SectionCard from './SectionCard'
 import Podium from './Podium'
+import RangeControls from './RangeControls'
+import { usePeriodRange } from './usePeriodRange'
 import { pctTone } from './statusMeta'
 
 const PERIODS = [
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
   { id: 'all', label: 'Histórico' },
+  { id: 'custom', label: 'Fechas' },
 ]
 
 function rankBadge(rank) {
@@ -26,7 +28,7 @@ function rankBadge(rank) {
 
 export default function RankingTab() {
   const { daily, roster, loading } = useSchedules()
-  const [period, setPeriod] = useState('month')
+  const ctl = usePeriodRange('month')
 
   const nameByKey = useMemo(() => {
     const m = new Map()
@@ -35,21 +37,17 @@ export default function RankingTab() {
   }, [roster])
 
   const rows = useMemo(() => {
-    const base =
-      period === 'all'
-        ? daily
-        : (() => {
-            const { from, to } = periodRange(period)
-            return daily.filter((d) => inRange(d.date, from, to))
-          })()
-    return base.map((d) => ({ ...d, name: d.name || nameByKey.get(d.riderKey) || d.riderKey }))
-  }, [daily, nameByKey, period])
+    const { from, to } = ctl.range
+    return daily
+      .filter((d) => inRange(d.date, from, to))
+      .map((d) => ({ ...d, name: d.name || nameByKey.get(d.riderKey) || d.riderKey }))
+  }, [daily, nameByKey, ctl.range])
 
   const ranking = useMemo(() => buildRanking(rows), [rows])
 
   function exportCsv() {
     downloadCsv(
-      `ranking_${period}.csv`,
+      `ranking_${ctl.period}.csv`,
       [
         { key: 'rank', label: 'Puesto' },
         { key: 'name', label: 'Rider' },
@@ -77,9 +75,9 @@ export default function RankingTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <Segmented options={PERIODS} value={period} onChange={setPeriod} />
-        <span className="text-xs text-faint">{period === 'all' ? 'histórico' : periodLabel(period)}</span>
+      <div className="space-y-2">
+        <RangeControls ctl={ctl} presets={PERIODS} />
+        <p className="text-right text-xs text-faint">{ctl.label}</p>
       </div>
 
       {ranking.length === 0 ? (

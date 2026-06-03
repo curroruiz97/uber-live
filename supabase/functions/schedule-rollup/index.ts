@@ -149,27 +149,58 @@ async function rollupOrg(admin: any, orgId: string, fromDate: string, toDate: st
   return { days: complianceRows.length, alerts: alertRows.length }
 }
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  // Secreto de cron desde la BD (public.cron_config, RLS bloquea al navegador).
+  let body: any = {}
+  try { body = await req.json() } catch { body = {} }
+
+  // Autenticación dual:
+  //  (a) cron: secreto en cabecera x-cron-secret (almacenado en cron_config).
+  //  (b) on-demand: usuario autenticado owner/admin (vía supabase.functions.invoke),
+  //      validado contra org_members; solo recalcula SU org.
   const { data: cc } = await admin.from('cron_config').select('secret').maybeSingle()
   const expected = cc?.secret || ''
   const given = req.headers.get('x-cron-secret') || ''
-  if (!expected || given !== expected) return json(401, { error: 'unauthorized' })
+  const isCron = Boolean(expected) && given === expected
+
+  let targetOrgs: string[] | null = null
+  if (!isCron) {
+    const authHeader = req.headers.get('Authorization') || ''
+    const jwt = authHeader.replace(/^Bearer\s+/i, '')
+    const orgId = body.org_id
+    if (!jwt || !orgId) return json(401, { error: 'unauthorized' })
+    const { data: u } = await admin.auth.getUser(jwt)
+    const uid = u?.user?.id
+    if (!uid) return json(401, { error: 'unauthorized' })
+    const { data: mem } = await admin.from('org_members').select('role').eq('org_id', orgId).eq('user_id', uid).maybeSingle()
+    if (!mem || !['owner', 'admin'].includes(mem.role)) return json(403, { error: 'forbidden' })
+    targetOrgs = [orgId]
+  }
 
   // Rango: por defecto ayer y hoy (zona del servidor); admite override por body.
-  let body: any = {}
-  try { body = await req.json() } catch { body = {} }
   const today = new Date()
   const yesterday = new Date(today.getTime() - 86400000)
   const fromDate = body.from || yesterday.toISOString().slice(0, 10)
   const toDate = body.to || today.toISOString().slice(0, 10)
-  const { data: subs } = await admin.from('subscriptions').select('org_id, status')
-  const activeOrgs = (subs || []).filter((s: any) => ['active', 'trialing'].includes(s.status)).map((s: any) => s.org_id)
+
+  let orgs: string[]
+  if (targetOrgs) {
+    orgs = targetOrgs
+  } else {
+    const { data: subs } = await admin.from('subscriptions').select('org_id, status')
+    orgs = (subs || []).filter((s: any) => ['active', 'trialing'].includes(s.status)).map((s: any) => s.org_id)
+  }
 
   let totalDays = 0
-  for (const orgId of activeOrgs) {
+  for (const orgId of orgs) {
     try {
       const r = await rollupOrg(admin, orgId, fromDate, toDate)
       totalDays += r.days || 0
@@ -177,5 +208,8 @@ Deno.serve(async (req) => {
       console.error(`[rollup] org=${orgId}:`, (e as Error).message)
     }
   }
-  return json(200, { ok: true, from: fromDate, to: toDate, days: totalDays })
+  return new Response(JSON.stringify({ ok: true, from: fromDate, to: toDate, days: totalDays }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', ...CORS },
+  })
 })

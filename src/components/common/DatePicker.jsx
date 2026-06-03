@@ -21,7 +21,7 @@ function sameDay(a, b) {
   )
 }
 
-export default function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', className }) {
+export default function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa', className, block = false }) {
   const selected = parseISO(value)
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(() => monthStart(selected || new Date()))
@@ -66,12 +66,13 @@ export default function DatePicker({ value, onChange, placeholder = 'dd/mm/aaaa'
     : ''
 
   return (
-    <div ref={ref} className={clsx('relative', className)}>
+    <div ref={ref} className={clsx('relative', block && 'w-full', className)}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={clsx(
           'flex items-center gap-2 rounded-lg border bg-inset px-2.5 py-1.5 text-xs outline-none transition',
+          block && 'w-full',
           open ? 'border-accent/60' : 'border-line hover:border-accent/40',
           selected ? 'text-fg' : 'text-faint',
         )}

@@ -193,16 +193,41 @@ export function SchedulesProvider({ children }) {
   )
 
   // Guarda la configuración de horarios (zona horaria, márgenes, umbral) en org_settings.
+  // Upsert (no update): si la org aún no tiene fila de ajustes, update no guardaría nada
+  // y el rollup leería los valores por defecto. Con upsert se crea/actualiza siempre.
   const saveCfg = useCallback(
     async (patch) => {
       const next = { ...cfg, ...patch }
       setCfg(next)
       if (!demoMode && orgId) {
-        await supabase.from('org_settings').update({ schedule_config: next, updated_at: new Date().toISOString() }).eq('org_id', orgId)
+        const { error } = await supabase
+          .from('org_settings')
+          .upsert({ org_id: orgId, schedule_config: next, updated_at: new Date().toISOString() }, { onConflict: 'org_id' })
+        if (error) throw new Error(error.message)
       }
       return next
     },
     [cfg, demoMode, orgId],
+  )
+
+  // Recalcula el cumplimiento on-demand (no espera al cron nocturno): invoca la Edge
+  // Function schedule-rollup con la sesión del usuario; la función valida owner/admin
+  // (org_members) y deriva sesiones + compliance del rango a partir de las muestras.
+  const recompute = useCallback(
+    async (fromDate, toDate) => {
+      if (demoMode) {
+        loadDemo()
+        return { ok: true, demo: true }
+      }
+      if (!orgId) throw new Error('Sin organización activa')
+      const { data, error } = await supabase.functions.invoke('schedule-rollup', {
+        body: { org_id: orgId, from: fromDate, to: toDate },
+      })
+      if (error) throw new Error(error.message || 'No se pudo recalcular')
+      await loadReal()
+      return { ok: true, ...(data || {}) }
+    },
+    [demoMode, orgId, loadDemo, loadReal],
   )
 
   const unseenAlerts = useMemo(() => alerts.filter((a) => !a.acknowledged).length, [alerts])
@@ -212,18 +237,20 @@ export function SchedulesProvider({ children }) {
       cfg,
       setCfg,
       saveCfg,
+      recompute,
       roster,
       schedules,
       daily,
       alerts,
       unseenAlerts,
       loading,
+      demoMode,
       isOwnerOrAdmin,
       acknowledgeAlert,
       importSchedules,
       reload: demoMode ? loadDemo : loadReal,
     }),
-    [cfg, saveCfg, roster, schedules, daily, alerts, unseenAlerts, loading, isOwnerOrAdmin, acknowledgeAlert, importSchedules, demoMode, loadDemo, loadReal],
+    [cfg, saveCfg, recompute, roster, schedules, daily, alerts, unseenAlerts, loading, isOwnerOrAdmin, acknowledgeAlert, importSchedules, demoMode, loadDemo, loadReal],
   )
 
   return <SchedulesContext.Provider value={value}>{children}</SchedulesContext.Provider>

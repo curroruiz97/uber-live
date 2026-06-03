@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { LayoutDashboard, Users, Trophy, CalendarClock, History, Bell, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, Users, Trophy, CalendarClock, History, Bell, ShieldCheck, RefreshCw } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
+import { useToast } from '../../state/toast'
 import { selection } from '../../native/haptics'
 import SummaryTab from './SummaryTab'
 import RidersTab from './RidersTab'
@@ -21,7 +22,9 @@ const TABS = [
 
 export default function ScheduleView() {
   const [tab, setTab] = useState('resumen')
-  const { roster, schedules, daily, unseenAlerts } = useSchedules()
+  const [recomputing, setRecomputing] = useState(false)
+  const { roster, schedules, daily, unseenAlerts, recompute, demoMode, isOwnerOrAdmin } = useSchedules()
+  const { toast } = useToast()
 
   const pills = useMemo(
     () => [
@@ -31,6 +34,23 @@ export default function ScheduleView() {
     ],
     [roster, schedules, daily],
   )
+
+  async function handleRecompute() {
+    setRecomputing(true)
+    try {
+      const today = new Date()
+      const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      const res = await recompute(iso(new Date(today.getTime() - 34 * 86400000)), iso(today))
+      toast({
+        type: 'success',
+        title: 'Cumplimiento recalculado',
+        message: res.demo ? 'Datos de demostración actualizados.' : `${res.days ?? 0} jornadas procesadas (últimos 35 días).`,
+      })
+    } catch (e) {
+      toast({ type: 'error', title: 'No se pudo recalcular', message: e.message })
+    }
+    setRecomputing(false)
+  }
 
   return (
     <div className="space-y-4">
@@ -46,17 +66,30 @@ export default function ScheduleView() {
               <p className="text-xs text-muted">Asistencia, puntualidad y horas reales frente a los turnos planificados.</p>
             </div>
           </div>
-          {unseenAlerts > 0 && (
-            <button
-              onClick={() => {
-                selection()
-                setTab('avisos')
-              }}
-              className="hidden shrink-0 items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-500/15 dark:text-red-400 sm:inline-flex"
-            >
-              <Bell className="h-3.5 w-3.5" /> {unseenAlerts} sin ver
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {unseenAlerts > 0 && (
+              <button
+                onClick={() => {
+                  selection()
+                  setTab('avisos')
+                }}
+                className="hidden items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-500/15 dark:text-red-400 sm:inline-flex"
+              >
+                <Bell className="h-3.5 w-3.5" /> {unseenAlerts} sin ver
+              </button>
+            )}
+            {(isOwnerOrAdmin || demoMode) && (
+              <button
+                onClick={handleRecompute}
+                disabled={recomputing}
+                title="Recalcular el cumplimiento de los últimos 35 días a partir de la actividad capturada"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-fg transition hover:bg-inset disabled:opacity-50"
+              >
+                <RefreshCw className={clsx('h-3.5 w-3.5', recomputing && 'animate-spin')} />
+                Recalcular
+              </button>
+            )}
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {pills.map((p) => (

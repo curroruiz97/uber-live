@@ -150,9 +150,13 @@ async function rollupOrg(admin: any, orgId: string, fromDate: string, toDate: st
 }
 
 Deno.serve(async (req) => {
-  const secret = req.headers.get('x-cron-secret') || ''
-  const expected = Deno.env.get('CRON_SECRET') || ''
-  if (!expected || secret !== expected) return json(401, { error: 'unauthorized' })
+  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+
+  // Secreto de cron desde la BD (public.cron_config, RLS bloquea al navegador).
+  const { data: cc } = await admin.from('cron_config').select('secret').maybeSingle()
+  const expected = cc?.secret || ''
+  const given = req.headers.get('x-cron-secret') || ''
+  if (!expected || given !== expected) return json(401, { error: 'unauthorized' })
 
   // Rango: por defecto ayer y hoy (zona del servidor); admite override por body.
   let body: any = {}
@@ -161,8 +165,6 @@ Deno.serve(async (req) => {
   const yesterday = new Date(today.getTime() - 86400000)
   const fromDate = body.from || yesterday.toISOString().slice(0, 10)
   const toDate = body.to || today.toISOString().slice(0, 10)
-
-  const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
   const { data: subs } = await admin.from('subscriptions').select('org_id, status')
   const activeOrgs = (subs || []).filter((s: any) => ['active', 'trialing'].includes(s.status)).map((s: any) => s.org_id)
 

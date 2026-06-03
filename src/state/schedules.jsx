@@ -192,12 +192,26 @@ export function SchedulesProvider({ children }) {
     [demoMode, orgId, loadReal],
   )
 
+  // Guarda la configuración de horarios (zona horaria, márgenes, umbral) en org_settings.
+  const saveCfg = useCallback(
+    async (patch) => {
+      const next = { ...cfg, ...patch }
+      setCfg(next)
+      if (!demoMode && orgId) {
+        await supabase.from('org_settings').update({ schedule_config: next, updated_at: new Date().toISOString() }).eq('org_id', orgId)
+      }
+      return next
+    },
+    [cfg, demoMode, orgId],
+  )
+
   const unseenAlerts = useMemo(() => alerts.filter((a) => !a.acknowledged).length, [alerts])
 
   const value = useMemo(
     () => ({
       cfg,
       setCfg,
+      saveCfg,
       roster,
       schedules,
       daily,
@@ -209,7 +223,7 @@ export function SchedulesProvider({ children }) {
       importSchedules,
       reload: demoMode ? loadDemo : loadReal,
     }),
-    [cfg, roster, schedules, daily, alerts, unseenAlerts, loading, isOwnerOrAdmin, acknowledgeAlert, importSchedules, demoMode, loadDemo, loadReal],
+    [cfg, saveCfg, roster, schedules, daily, alerts, unseenAlerts, loading, isOwnerOrAdmin, acknowledgeAlert, importSchedules, demoMode, loadDemo, loadReal],
   )
 
   return <SchedulesContext.Provider value={value}>{children}</SchedulesContext.Provider>

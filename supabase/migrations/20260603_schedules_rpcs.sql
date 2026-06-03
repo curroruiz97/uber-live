@@ -67,7 +67,10 @@ begin
   return jsonb_build_object('cleared', v_deleted, 'from', p_from, 'to', p_to);
 end $$;
 
-revoke execute on function public.import_schedules(uuid, jsonb) from public;
-revoke execute on function public.recompute_compliance(uuid, date, date) from public;
+-- Least-privilege: solo usuarios autenticados (el cuerpo exige owner/admin).
+-- Supabase concede execute por defecto a anon/authenticated en funciones nuevas;
+-- revocamos explícitamente a public Y a anon (revoke from public no quita el grant explícito a anon).
+revoke execute on function public.import_schedules(uuid, jsonb) from public, anon;
+revoke execute on function public.recompute_compliance(uuid, date, date) from public, anon;
 grant execute on function public.import_schedules(uuid, jsonb) to authenticated;
 grant execute on function public.recompute_compliance(uuid, date, date) to authenticated;

@@ -20,6 +20,7 @@ import OfflineBanner from '../common/OfflineBanner'
 import PullToRefresh from '../common/PullToRefresh'
 import WhatsAppView from '../whatsapp/WhatsAppView'
 import MensatekView from '../mensatek/MensatekView'
+import ScheduleView from '../schedules/ScheduleView'
 import SettingsLayout from '../settings/SettingsLayout'
 import TrialBanner from '../billing/TrialBanner'
 import { useNativeBackToDashboard } from '../../native/useNativeBack'
@@ -46,6 +47,8 @@ function LoadingState() {
 
 function Content({ activeNav }) {
   if (activeNav === 'config') return <SettingsLayout />
+
+  if (activeNav === 'horarios') return <ScheduleView />
 
   // "Mensajes": en móvil se conmuta WhatsApp/Mensatek con el segmented; en escritorio
   // cada canal tiene su entrada propia en el sidebar.

@@ -9,6 +9,7 @@ import { BrandProvider } from './state/BrandContext'
 import { PlanProvider, usePlan } from './state/PlanContext'
 import { WhatsAppProvider } from './state/whatsapp'
 import { MensatekProvider } from './state/mensatek'
+import { SchedulesProvider } from './state/schedules'
 import AuthScreens from './components/onboarding/AuthScreens'
 import CreateOrgWizard from './components/onboarding/CreateOrgWizard'
 import SubscriptionGate from './components/billing/SubscriptionGate'
@@ -44,7 +45,9 @@ function AuthGate() {
               <AppProvider>
                 <WhatsAppProvider>
                   <MensatekProvider>
-                    <Root />
+                    <SchedulesProvider>
+                      <Root />
+                    </SchedulesProvider>
                   </MensatekProvider>
                 </WhatsAppProvider>
               </AppProvider>

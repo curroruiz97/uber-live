@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Map as MapIcon,
   Users,
+  CalendarClock,
   Settings,
   ChevronsLeft,
   ChevronsRight,
@@ -10,6 +11,7 @@ import {
 import { useApp } from '../../state/AppContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import { useMensatek } from '../../state/mensatek'
+import { useSchedules } from '../../state/schedules'
 import WhatsAppIcon from '../common/WhatsAppIcon'
 import MensatekIcon from '../common/MensatekIcon'
 import Logo from '../common/Logo'
@@ -18,6 +20,7 @@ const NAV = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'mapa', label: 'Mapa en vivo', icon: MapIcon },
   { id: 'riders', label: 'Riders', icon: Users },
+  { id: 'horarios', label: 'Horarios', icon: CalendarClock },
   { id: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon },
   { id: 'mensatek', label: 'Mensatek', icon: MensatekIcon },
   { id: 'config', label: 'Ajustes', icon: Settings },
@@ -27,6 +30,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const { sidebarCollapsed, toggleSidebar, activeNav, setActiveNav } = useApp()
   const { messagesToday: waToday } = useWhatsApp()
   const { messagesToday: mkToday } = useMensatek()
+  const { unseenAlerts } = useSchedules()
 
   return (
     <>
@@ -60,7 +64,8 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
           {NAV.map((item) => {
             const Icon = item.icon
             const active = activeNav === item.id
-            const badge = item.id === 'whatsapp' ? waToday : item.id === 'mensatek' ? mkToday : 0
+            const badge = item.id === 'whatsapp' ? waToday : item.id === 'mensatek' ? mkToday : item.id === 'horarios' ? unseenAlerts : 0
+            const badgeAlert = item.id === 'horarios'
             return (
               <button
                 key={item.id}
@@ -80,12 +85,12 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
                 <span className="relative shrink-0">
                   <Icon className={clsx('h-5 w-5', active && 'text-accent')} />
                   {badge > 0 && sidebarCollapsed && (
-                    <span className="absolute -right-1.5 -top-1.5 h-2 w-2 rounded-full bg-[#25D366] ring-2 ring-panel" />
+                    <span className={clsx('absolute -right-1.5 -top-1.5 h-2 w-2 rounded-full ring-2 ring-panel', badgeAlert ? 'bg-red-500' : 'bg-[#25D366]')} />
                   )}
                 </span>
                 {!sidebarCollapsed && <span className="flex-1 truncate text-left">{item.label}</span>}
                 {!sidebarCollapsed && badge > 0 && (
-                  <span className="rounded-full bg-[#25D366]/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-[#25D366]">
+                  <span className={clsx('rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums', badgeAlert ? 'bg-red-500/15 text-red-600 dark:text-red-400' : 'bg-[#25D366]/15 text-[#25D366]')}>
                     {badge}
                   </span>
                 )}

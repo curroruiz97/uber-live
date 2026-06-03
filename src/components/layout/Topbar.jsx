@@ -14,6 +14,7 @@ const TITLES = {
   dashboard: 'Dashboard',
   mapa: 'Mapa en vivo',
   riders: 'Riders',
+  horarios: 'Horarios y asistencia',
   whatsapp: 'WhatsApp',
   mensatek: 'Mensatek',
   config: 'Ajustes',

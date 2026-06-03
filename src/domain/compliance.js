@@ -161,3 +161,65 @@ export function buildRanking(rows) {
   )
   return ranking.map((r, i) => ({ ...r, rank: i + 1 }))
 }
+
+// Distribución por estado de un conjunto de registros diarios.
+// Devuelve { cumple, tarde, incompleto, ausente, total }.
+export function statusBreakdown(rows) {
+  const out = { cumple: 0, tarde: 0, incompleto: 0, ausente: 0, total: rows.length }
+  for (const r of rows) {
+    if (Object.prototype.hasOwnProperty.call(out, r.status)) out[r.status] += 1
+  }
+  return out
+}
+
+// Serie temporal agregada por día (para el gráfico de tendencia).
+// Devuelve [{ date, avgCompliancePct, attendancePct, attended, absences, total }] ordenado por fecha ascendente.
+export function trendByDate(rows) {
+  const byDate = new Map()
+  for (const r of rows) {
+    if (!byDate.has(r.date)) byDate.set(r.date, [])
+    byDate.get(r.date).push(r)
+  }
+  return [...byDate.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([date, list]) => {
+      const agg = aggregateCompliance(list)
+      return {
+        date,
+        avgCompliancePct: agg.avgCompliancePct,
+        attendancePct: agg.attendancePct,
+        attended: agg.days - agg.absences,
+        absences: agg.absences,
+        total: agg.days,
+      }
+    })
+}
+
+// Estadísticas por rider para la vista de riders: agregados + serie de % + último estado.
+// metaByKey: Map(riderKey -> { name, provider, phone, vehicleType }). Ordena por nombre.
+export function buildRiderStats(rows, metaByKey = new Map()) {
+  const byRider = new Map()
+  for (const r of rows) {
+    if (!byRider.has(r.riderKey)) byRider.set(r.riderKey, [])
+    byRider.get(r.riderKey).push(r)
+  }
+  const stats = [...byRider.entries()].map(([riderKey, list]) => {
+    const sorted = [...list].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    const meta = metaByKey.get(riderKey) || {}
+    const agg = aggregateCompliance(sorted)
+    const last = sorted[sorted.length - 1]
+    return {
+      riderKey,
+      name: meta.name || list[0].name || riderKey,
+      provider: meta.provider || list[0].provider || null,
+      phone: meta.phone || null,
+      vehicleType: meta.vehicleType || null,
+      ...agg,
+      trend: sorted.map((d) => d.compliancePct),
+      lastStatus: last ? last.status : null,
+      lastDate: last ? last.date : null,
+    }
+  })
+  stats.sort((a, b) => a.name.localeCompare(b.name))
+  return stats
+}

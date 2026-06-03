@@ -11,10 +11,10 @@ import OrgSwitcher from './OrgSwitcher'
 import { impactLight } from '../../native/haptics'
 
 const TITLES = {
-  dashboard: 'Dashboard',
-  mapa: 'Mapa en vivo',
+  dashboard: 'Mapas',
   riders: 'Riders',
-  horarios: 'Horarios y asistencia',
+  cumplimiento: 'Cumplimiento de Riders',
+  horarios: 'Cumplimiento de Riders',
   whatsapp: 'WhatsApp',
   mensatek: 'Mensatek',
   config: 'Ajustes',

@@ -14,7 +14,7 @@ const SECTIONS = [
   { id: 'cuenta', label: 'Cuenta y empresa', icon: Building2, Comp: AccountCompanySection },
   { id: 'equipo', label: 'Equipo y roles', icon: Users, Comp: TeamSection },
   { id: 'integraciones', label: 'Integraciones / APIs', icon: Plug, Comp: IntegrationsSection },
-  { id: 'horarios', label: 'Horarios', icon: CalendarClock, Comp: SchedulesSection },
+  { id: 'horarios', label: 'Cumplimiento', icon: CalendarClock, Comp: SchedulesSection },
   { id: 'facturacion', label: 'Facturación y plan', icon: CreditCard, Comp: BillingSection },
   { id: 'marca', label: 'Marca', icon: Palette, Comp: BrandingSection },
   { id: 'notificaciones', label: 'Notificaciones', icon: Bell, Comp: NotificationsSection },

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   Search,
-  LayoutDashboard,
   Map as MapIcon,
   Users,
+  ShieldCheck,
   Settings,
   Sun,
   Moon,
@@ -38,8 +38,8 @@ export default function CommandPalette({ open, onClose }) {
   const items = useMemo(() => {
     const ql = q.trim().toLowerCase()
     const actions = [
-      { id: 'nav-dashboard', group: 'Navegación', label: 'Ir a Dashboard', icon: LayoutDashboard, run: () => setActiveNav('dashboard') },
-      { id: 'nav-mapa', group: 'Navegación', label: 'Ir a Mapa en vivo', icon: MapIcon, run: () => setActiveNav('mapa') },
+      { id: 'nav-dashboard', group: 'Navegación', label: 'Ir a Mapas', icon: MapIcon, run: () => setActiveNav('dashboard') },
+      { id: 'nav-cumplimiento', group: 'Navegación', label: 'Ir a Cumplimiento', icon: ShieldCheck, run: () => setActiveNav('cumplimiento') },
       { id: 'nav-riders', group: 'Navegación', label: 'Ir a Riders', icon: Users, run: () => setActiveNav('riders') },
       { id: 'nav-config', group: 'Navegación', label: 'Ir a Ajustes', icon: Settings, run: () => setActiveNav('config') },
       { id: 'theme-light', group: 'Tema', label: 'Tema: Claro', icon: Sun, run: () => setTheme('light') },

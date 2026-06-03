@@ -1,16 +1,17 @@
 import clsx from 'clsx'
-import { LayoutDashboard, Map as MapIcon, Users, MessageCircle, Settings } from 'lucide-react'
+import { Map as MapIcon, Users, MessageCircle, Settings, ShieldCheck } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import { useMensatek } from '../../state/mensatek'
+import { useSchedules } from '../../state/schedules'
 import { selection } from '../../native/haptics'
 
 // La pestaña "Mensajes" agrupa WhatsApp + Mensatek (dentro se cambia con un segmented).
 const MESSAGING = ['whatsapp', 'mensatek']
 
 const TABS = [
-  { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
-  { id: 'mapa', label: 'Mapa', icon: MapIcon },
+  { id: 'dashboard', label: 'Mapas', icon: MapIcon },
+  { id: 'cumplimiento', label: 'Cumplimiento', icon: ShieldCheck },
   { id: 'riders', label: 'Riders', icon: Users },
   { id: 'mensajes', label: 'Mensajes', icon: MessageCircle, target: 'whatsapp' },
   { id: 'config', label: 'Ajustes', icon: Settings },
@@ -22,6 +23,7 @@ export default function BottomTabBar() {
   const { activeNav, setActiveNav } = useApp()
   const { messagesToday: waToday } = useWhatsApp()
   const { messagesToday: mkToday } = useMensatek()
+  const { unseenAlerts } = useSchedules()
   const msgBadge = (waToday || 0) + (mkToday || 0)
 
   function isActive(tab) {
@@ -45,7 +47,8 @@ export default function BottomTabBar() {
         {TABS.map((tab) => {
           const Icon = tab.icon
           const on = isActive(tab)
-          const showBadge = tab.id === 'mensajes' && msgBadge > 0
+          const badgeCount = tab.id === 'mensajes' ? msgBadge : tab.id === 'cumplimiento' ? unseenAlerts : 0
+          const badgeRed = tab.id === 'cumplimiento'
           return (
             <button
               key={tab.id}
@@ -68,9 +71,14 @@ export default function BottomTabBar() {
                   className={clsx('h-[22px] w-[22px] transition-transform duration-300 ease-spring', on && 'text-accent')}
                   strokeWidth={on ? 2.4 : 2}
                 />
-                {showBadge && (
-                  <span className="absolute -right-2 -top-1.5 min-w-[16px] animate-pop rounded-full bg-accent px-1 text-center text-[9px] font-bold leading-4 text-white">
-                    {msgBadge > 99 ? '99+' : msgBadge}
+                {badgeCount > 0 && (
+                  <span
+                    className={clsx(
+                      'absolute -right-2 -top-1.5 min-w-[16px] animate-pop rounded-full px-1 text-center text-[9px] font-bold leading-4 text-white',
+                      badgeRed ? 'bg-red-500' : 'bg-accent',
+                    )}
+                  >
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
               </span>

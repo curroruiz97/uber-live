@@ -1,9 +1,8 @@
 import clsx from 'clsx'
 import {
-  LayoutDashboard,
   Map as MapIcon,
   Users,
-  CalendarClock,
+  ShieldCheck,
   Settings,
   ChevronsLeft,
   ChevronsRight,
@@ -17,10 +16,9 @@ import MensatekIcon from '../common/MensatekIcon'
 import Logo from '../common/Logo'
 
 const NAV = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'mapa', label: 'Mapa en vivo', icon: MapIcon },
+  { id: 'dashboard', label: 'Mapas', icon: MapIcon },
+  { id: 'cumplimiento', label: 'Cumplimiento', icon: ShieldCheck },
   { id: 'riders', label: 'Riders', icon: Users },
-  { id: 'horarios', label: 'Horarios', icon: CalendarClock },
   { id: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon },
   { id: 'mensatek', label: 'Mensatek', icon: MensatekIcon },
   { id: 'config', label: 'Ajustes', icon: Settings },
@@ -64,8 +62,8 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
           {NAV.map((item) => {
             const Icon = item.icon
             const active = activeNav === item.id
-            const badge = item.id === 'whatsapp' ? waToday : item.id === 'mensatek' ? mkToday : item.id === 'horarios' ? unseenAlerts : 0
-            const badgeAlert = item.id === 'horarios'
+            const badge = item.id === 'whatsapp' ? waToday : item.id === 'mensatek' ? mkToday : item.id === 'cumplimiento' ? unseenAlerts : 0
+            const badgeAlert = item.id === 'cumplimiento'
             return (
               <button
                 key={item.id}

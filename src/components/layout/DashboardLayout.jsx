@@ -48,7 +48,7 @@ function LoadingState() {
 function Content({ activeNav }) {
   if (activeNav === 'config') return <SettingsLayout />
 
-  if (activeNav === 'horarios') return <ScheduleView />
+  if (activeNav === 'cumplimiento' || activeNav === 'horarios') return <ScheduleView />
 
   // "Mensajes": en móvil se conmuta WhatsApp/Mensatek con el segmented; en escritorio
   // cada canal tiene su entrada propia en el sidebar.
@@ -68,22 +68,6 @@ function Content({ activeNav }) {
         <KpiCards />
         <Filters />
         <RidersTable />
-      </div>
-    )
-  }
-
-  if (activeNav === 'mapa') {
-    return (
-      <div className="space-y-4">
-        <FleetProviderSegmented />
-        <KpiCards />
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
-          <div className="min-w-0 space-y-3">
-            <Filters />
-            <FleetMap height="h-[60vh]" />
-          </div>
-          <ActivityFeed />
-        </div>
       </div>
     )
   }

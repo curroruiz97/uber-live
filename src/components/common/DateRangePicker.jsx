@@ -21,11 +21,14 @@ const fmt = (iso) => {
 
 // Selector de rango de fechas estilo Booking: un solo calendario, eliges inicio y luego
 // fin (con previsualización al pasar el ratón) y el nº de días se calcula solo.
-// onChange({ from, to }) con ISO YYYY-MM-DD (to = null mientras solo hay inicio).
+// La selección en curso se mantiene en un "anchor" interno y onChange({ from, to }) solo
+// se dispara cuando el rango está COMPLETO (ambos extremos) o al limpiar (from=to=null).
+// Así el componente no depende de cómo persista el padre entre clics.
 export default function DateRangePicker({ from, to, onChange, placeholder = 'Selecciona fechas', className, block = false }) {
   const [open, setOpen] = useState(false)
   const [coords, setCoords] = useState(null)
   const [view, setView] = useState(() => monthStart(parseISO(from) || new Date()))
+  const [anchor, setAnchor] = useState(null) // inicio elegido a la espera del fin
   const [hover, setHover] = useState(null)
   const btnRef = useRef(null)
   const popRef = useRef(null)
@@ -44,6 +47,8 @@ export default function DateRangePicker({ from, to, onChange, placeholder = 'Sel
   useLayoutEffect(() => {
     if (open) {
       place()
+      setAnchor(null)
+      setHover(null)
       setView(monthStart(parseISO(from) || new Date()))
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,26 +88,32 @@ export default function DateRangePicker({ from, to, onChange, placeholder = 'Sel
 
   function pick(d) {
     const iso = toISO(d)
-    if (!from || (from && to)) {
-      onChange({ from: iso, to: null })
-      setHover(null)
-    } else if (iso < from) {
-      onChange({ from: iso, to: from })
-      setOpen(false)
+    if (!anchor) {
+      // Primer clic: fija el inicio y espera el fin (sin emitir aún).
+      setAnchor(iso)
+      setHover(iso)
     } else {
-      onChange({ from, to: iso })
+      // Segundo clic: completa el rango (ordenado) y emite.
+      const a = iso < anchor ? iso : anchor
+      const b = iso < anchor ? anchor : iso
+      setAnchor(null)
+      setHover(null)
+      onChange({ from: a, to: b })
       setOpen(false)
     }
   }
 
-  // Límites para el sombreado del rango (usa la previsualización al elegir el fin).
-  const previewEnd = to || (from && !to ? hover : null)
-  const lo = from && previewEnd ? (from < previewEnd ? from : previewEnd) : null
-  const hi = from && previewEnd ? (from < previewEnd ? previewEnd : from) : null
+  // Rango a resaltar: durante la selección usa el anchor + previsualización por hover;
+  // ya completado usa los props from/to.
+  const selFrom = anchor || from
+  const selTo = anchor ? null : to
+  const previewEnd = selTo || (anchor ? hover : null)
+  const lo = selFrom && previewEnd ? (selFrom < previewEnd ? selFrom : previewEnd) : null
+  const hi = selFrom && previewEnd ? (selFrom < previewEnd ? previewEnd : selFrom) : null
 
   const label = view.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-  const n = rangeDays(from, to)
-  const display = from ? (to ? `${fmt(from)} – ${fmt(to)}` : `${fmt(from)} – …`) : ''
+  const committed = rangeDays(from, to)
+  const display = from ? (to ? `${fmt(from)} – ${fmt(to)}` : fmt(from)) : ''
 
   return (
     <>
@@ -114,7 +125,7 @@ export default function DateRangePicker({ from, to, onChange, placeholder = 'Sel
       >
         <Calendar className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">{display || placeholder}</span>
-        {n > 0 && <span className="ml-auto shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{n}d</span>}
+        {committed > 0 && <span className="ml-auto shrink-0 rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-accent">{committed}d</span>}
       </button>
 
       {open && coords && createPortal(
@@ -131,19 +142,19 @@ export default function DateRangePicker({ from, to, onChange, placeholder = 'Sel
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-y-0.5" onMouseLeave={() => setHover(null)}>
+          <div className="grid grid-cols-7 gap-y-0.5" onMouseLeave={() => anchor && setHover(anchor)}>
             {cells.map((d, i) => {
               const iso = toISO(d)
               const inMonth = d.getMonth() === view.getMonth()
               const isToday = sameDay(d, today)
-              const isEdge = (from && iso === from) || (to && iso === to)
+              const isEdge = (selFrom && iso === selFrom) || (selTo && iso === selTo)
               const inRange = lo && hi && iso >= lo && iso <= hi
               return (
                 <div key={i} className={clsx('flex justify-center', inRange && !isEdge && 'bg-accent/10', inRange && iso === lo && 'rounded-l-md', inRange && iso === hi && 'rounded-r-md')}>
                   <button
                     onClick={() => pick(d)}
                     onMouseEnter={() => {
-                      if (from && !to) setHover(iso)
+                      if (anchor) setHover(iso)
                     }}
                     className={clsx(
                       'flex h-7 w-7 items-center justify-center rounded-md text-xs transition',
@@ -159,20 +170,28 @@ export default function DateRangePicker({ from, to, onChange, placeholder = 'Sel
 
           <div className="mt-2 flex items-center justify-between border-t border-line pt-2 text-xs">
             <span className="text-muted">
-              {n > 0 ? (
+              {anchor ? (
+                lo && hi && lo !== hi ? (
+                  <>
+                    <span className="font-semibold text-fg">{rangeDays(lo, hi)}</span> días · elige el fin
+                  </>
+                ) : (
+                  'Elige el fin'
+                )
+              ) : committed > 0 ? (
                 <>
-                  <span className="font-semibold text-fg">{n}</span> {n === 1 ? 'día' : 'días'}
-                  {!to && <span className="text-faint"> · elige el fin</span>}
+                  <span className="font-semibold text-fg">{committed}</span> {committed === 1 ? 'día' : 'días'}
                 </>
               ) : (
                 'Elige inicio y fin'
               )}
             </span>
-            {from && (
+            {(from || anchor) && (
               <button
                 onClick={() => {
-                  onChange({ from: null, to: null })
+                  setAnchor(null)
                   setHover(null)
+                  onChange({ from: null, to: null })
                 }}
                 className="rounded-md px-2 py-1 text-muted transition hover:bg-inset hover:text-fg"
               >

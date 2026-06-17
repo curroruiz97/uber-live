@@ -1,101 +1,202 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { supabase } from '../../lib/supabase'
 import { useOrg } from '../../state/OrgContext'
+import { addDaysIso } from './platforms'
 
-const KEY_BASE = 'ul-shift-planner'
-
-// Clave de almacenamiento por organización (cada empresa tiene su propio planificador).
-function storageKey(orgId) {
-  return orgId ? `${KEY_BASE}:${orgId}` : KEY_BASE
+// Normaliza un nombre para cruzar PDF <-> roster (sin acentos, mayúsculas, espacios simples).
+function normName(s) {
+  return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim()
 }
+const digits = (s) => (s || '').replace(/\D/g, '')
 
-function newId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-  return `s_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6).toString(36)}`
-}
-
-function makeShift(plataforma) {
-  return { id: newId(), plataforma, dia: 'lunes', horaInicio: '09:00', horaFin: '17:00', notas: '' }
-}
-
-// Sanea cualquier dato previo del almacenamiento a la forma esperada del turno.
-function normalize(raw) {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .filter((s) => s && (s.plataforma === 'uber' || s.plataforma === 'glovo'))
-    .map((s) => ({
-      id: s.id || newId(),
-      plataforma: s.plataforma,
-      dia: s.dia || 'lunes',
-      horaInicio: s.horaInicio || '09:00',
-      horaFin: s.horaFin || '17:00',
-      notas: typeof s.notas === 'string' ? s.notas : '',
-    }))
-}
-
-// Estado + persistencia (localStorage por organización) del planificador de turnos.
-// Estructura de cada turno: { id, plataforma, dia, horaInicio, horaFin, notas }.
+// Estado + persistencia en Supabase del planificador de turnos por rider y de los estados.
+// shift_plans (turnos semanales) + rider_absences (estados con duración/previsión).
 export function useShiftPlanner() {
-  const { currentOrgId: orgId } = useOrg()
-  const key = storageKey(orgId)
+  const { currentOrgId: orgId, isOwnerOrAdmin } = useOrg()
   const [shifts, setShifts] = useState([])
-  // hydratedKey es estado (no ref) para que el efecto de guardado capture el valor
-  // previo al cambio de org y nunca escriba los turnos de una org en la clave de otra.
-  const [hydratedKey, setHydratedKey] = useState(null)
+  const [absences, setAbsences] = useState([])
+  const [roster, setRoster] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
 
-  // Carga al montar y cada vez que cambia la organización.
-  useEffect(() => {
-    try {
-      setShifts(normalize(JSON.parse(localStorage.getItem(key) || '[]')))
-    } catch {
+  const load = useCallback(async () => {
+    if (!orgId) {
       setShifts([])
+      setAbsences([])
+      setRoster([])
+      setLoading(false)
+      return
     }
-    setHydratedKey(key)
-  }, [key])
-
-  // Persiste solo cuando los turnos cargados corresponden a la clave actual.
-  useEffect(() => {
-    if (hydratedKey !== key) return
+    setLoading(true)
     try {
-      localStorage.setItem(key, JSON.stringify(shifts))
-    } catch {
-      /* almacenamiento lleno o no disponible: se ignora */
+      const [sp, ab, ro] = await Promise.all([
+        supabase.from('shift_plans').select('*').eq('org_id', orgId),
+        supabase.from('rider_absences').select('*').eq('org_id', orgId),
+        supabase.from('rider_roster').select('rider_key, name, phone').eq('org_id', orgId),
+      ])
+      setShifts(sp.data || [])
+      setAbsences(ab.data || [])
+      setRoster(ro.data || [])
+    } finally {
+      setLoading(false)
     }
-  }, [shifts, hydratedKey, key])
+  }, [orgId])
 
-  const addShift = useCallback((plataforma) => {
-    const shift = makeShift(plataforma)
-    setShifts((prev) => [...prev, shift])
-    return shift.id
-  }, [])
+  useEffect(() => {
+    load()
+  }, [load])
 
-  const updateShift = useCallback((id, patch) => {
+  // Mapa nombre normalizado -> teléfono del roster de Uber (para el cruce por teléfono).
+  const phoneByName = useMemo(() => {
+    const m = new Map()
+    for (const r of roster) if (r.phone) m.set(normName(r.name), r.phone)
+    return m
+  }, [roster])
+
+  const crossPhone = useCallback((name) => phoneByName.get(normName(name)) || null, [phoneByName])
+
+  // ---- CRUD turnos ----
+  const addShift = useCallback(
+    async (riderName, city, provider, patch = {}) => {
+      const phone = crossPhone(riderName)
+      const row = {
+        org_id: orgId,
+        provider: provider || 'uber',
+        city: city || null,
+        rider_name: riderName,
+        rider_phone: phone,
+        rider_key: phone ? digits(phone) : null,
+        dia: patch.dia || 'lunes',
+        turno: patch.turno || 'manana',
+        hora_inicio: patch.hora_inicio || '09:00',
+        hora_fin: patch.hora_fin || '14:00',
+        notas: patch.notas || null,
+        sort: patch.sort ?? 0,
+      }
+      const { data, error } = await supabase.from('shift_plans').insert(row).select().single()
+      if (error) throw new Error(error.message)
+      setShifts((prev) => [...prev, data])
+      return data
+    },
+    [orgId, crossPhone],
+  )
+
+  const updateShift = useCallback(async (id, patch) => {
     setShifts((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
+    const { error } = await supabase.from('shift_plans').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
   }, [])
 
-  const removeShift = useCallback((id) => {
+  const removeShift = useCallback(async (id) => {
     setShifts((prev) => prev.filter((s) => s.id !== id))
+    const { error } = await supabase.from('shift_plans').delete().eq('id', id)
+    if (error) throw new Error(error.message)
   }, [])
 
-  // Mueve un turno arriba/abajo intercambiándolo con su vecino de la MISMA plataforma.
-  const moveShift = useCallback((id, dir) => {
-    setShifts((prev) => {
-      const idx = prev.findIndex((s) => s.id === id)
-      if (idx < 0) return prev
-      const step = dir === 'up' ? -1 : 1
-      let j = idx + step
-      while (j >= 0 && j < prev.length && prev[j].plataforma !== prev[idx].plataforma) j += step
-      if (j < 0 || j >= prev.length) return prev
-      const next = [...prev]
-      ;[next[idx], next[j]] = [next[j], next[idx]]
-      return next
-    })
+  // ---- CRUD estados/ausencias ----
+  const addAbsence = useCallback(
+    async (riderName, city, provider, patch = {}) => {
+      const phone = crossPhone(riderName)
+      const row = {
+        org_id: orgId,
+        provider: provider || 'uber',
+        city: city || null,
+        rider_name: riderName,
+        rider_phone: phone,
+        rider_key: phone ? digits(phone) : null,
+        tipo: patch.tipo || 'baja_laboral',
+        fecha_inicio: patch.fecha_inicio || null,
+        dias: patch.dias ?? null,
+        fecha_fin: patch.fecha_fin || null,
+        nota: patch.nota || null,
+      }
+      const { data, error } = await supabase.from('rider_absences').insert(row).select().single()
+      if (error) throw new Error(error.message)
+      setAbsences((prev) => [...prev, data])
+      return data
+    },
+    [orgId, crossPhone],
+  )
+
+  // Al cambiar fecha_inicio o días recalcula fecha_fin (previsión de días no trabajables).
+  const updateAbsence = useCallback(async (id, patch) => {
+    setAbsences((prev) =>
+      prev.map((a) => {
+        if (a.id !== id) return a
+        const next = { ...a, ...patch }
+        if ('fecha_inicio' in patch || 'dias' in patch) {
+          next.fecha_fin = next.fecha_inicio && next.dias ? addDaysIso(next.fecha_inicio, Math.max(0, Number(next.dias) - 1)) : null
+        }
+        return next
+      }),
+    )
+    const full = { ...patch }
+    if ('fecha_inicio' in patch || 'dias' in patch) {
+      const base = absences.find((a) => a.id === id) || {}
+      const fi = patch.fecha_inicio ?? base.fecha_inicio
+      const di = patch.dias ?? base.dias
+      full.fecha_fin = fi && di ? addDaysIso(fi, Math.max(0, Number(di) - 1)) : null
+    }
+    const { error } = await supabase.from('rider_absences').update({ ...full, updated_at: new Date().toISOString() }).eq('id', id)
+    if (error) throw new Error(error.message)
+  }, [absences])
+
+  const removeAbsence = useCallback(async (id) => {
+    setAbsences((prev) => prev.filter((a) => a.id !== id))
+    const { error } = await supabase.from('rider_absences').delete().eq('id', id)
+    if (error) throw new Error(error.message)
   }, [])
 
-  const byPlatform = useMemo(() => {
-    const out = { uber: [], glovo: [] }
-    for (const s of shifts) if (out[s.plataforma]) out[s.plataforma].push(s)
-    return out
-  }, [shifts])
+  // Importa el seed (datos verificados de los PDFs). Idempotente: reemplaza los turnos y
+  // estados de ese proveedor. Cruza nombre -> teléfono contra el roster cuando existe.
+  const importSeed = useCallback(async () => {
+    if (!orgId) throw new Error('Sin organización activa')
+    setBusy(true)
+    try {
+      const seed = (await import('../../data/horariosSeed.json')).default
+      const provider = seed.provider || 'uber'
+      await supabase.from('shift_plans').delete().eq('org_id', orgId).eq('provider', provider)
+      await supabase.from('rider_absences').delete().eq('org_id', orgId).eq('provider', provider)
 
-  return { shifts, byPlatform, ready: hydratedKey === key, addShift, updateShift, removeShift, moveShift }
+      const shiftRows = seed.shifts.map((s) => {
+        const phone = crossPhone(s.rider_name)
+        return { ...s, org_id: orgId, provider, rider_phone: phone, rider_key: phone ? digits(phone) : null }
+      })
+      const absRows = (seed.absences || []).map((a) => {
+        const phone = crossPhone(a.rider_name)
+        return { ...a, org_id: orgId, provider, rider_phone: phone, rider_key: phone ? digits(phone) : null }
+      })
+      // Inserta en lotes para no superar límites de payload.
+      for (let i = 0; i < shiftRows.length; i += 500) {
+        const { error } = await supabase.from('shift_plans').insert(shiftRows.slice(i, i + 500))
+        if (error) throw new Error(error.message)
+      }
+      if (absRows.length) {
+        const { error } = await supabase.from('rider_absences').insert(absRows)
+        if (error) throw new Error(error.message)
+      }
+      await load()
+      return { shifts: shiftRows.length, absences: absRows.length }
+    } finally {
+      setBusy(false)
+    }
+  }, [orgId, crossPhone, load])
+
+  return {
+    shifts,
+    absences,
+    roster,
+    loading,
+    busy,
+    isOwnerOrAdmin,
+    matchedPhones: roster.filter((r) => r.phone).length,
+    addShift,
+    updateShift,
+    removeShift,
+    addAbsence,
+    updateAbsence,
+    removeAbsence,
+    importSeed,
+    reload: load,
+  }
 }

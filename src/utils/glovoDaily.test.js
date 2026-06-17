@@ -14,6 +14,24 @@ describe('digits', () => {
   it('deja solo dígitos', () => {
     expect(digits('+34 611 222 333')).toBe('34611222333')
   })
+  it('quita la parte decimal de exportaciones float (".0")', () => {
+    expect(digits('698870966.0')).toBe('698870966')
+    expect(digits('698870966')).toBe('698870966')
+    expect(digits('614563367,0')).toBe('614563367')
+  })
+})
+
+describe('aggregateGlovoRows · teléfono float', () => {
+  it('un teléfono con ".0" se fusiona con su versión limpia (mismo rider_key)', () => {
+    const rows = [
+      { driver_number: '614563367', datestr: '2026-06-09 00:00:00.000', driver_name: 'ALEX', online_hours: '2' },
+      { driver_number: '614563367.0', datestr: '2026-06-09 00:00:00.000', driver_name: 'ALEX', online_hours: '3' },
+    ]
+    const agg = aggregateGlovoRows(rows)
+    expect(agg).toHaveLength(1)
+    expect(agg[0].rider_key).toBe('614563367')
+    expect(agg[0].online_hours).toBe(5)
+  })
 })
 
 describe('aggregateGlovoRows', () => {

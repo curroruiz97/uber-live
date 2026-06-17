@@ -246,7 +246,7 @@ export function SchedulesProvider({ children }) {
         provider: provider || 'uber',
         rider_name: riderName,
         name_norm: normName(riderName),
-        rider_key: rosterCandidate.rider_key,
+        rider_key: rosterCandidate.rider_key ?? rosterCandidate.riderKey,
         rider_phone: rosterCandidate.phone || null,
         method: 'manual',
         confidence: null,

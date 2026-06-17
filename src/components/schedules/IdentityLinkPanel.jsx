@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react'
-import clsx from 'clsx'
-import { Link2, Wand2, Loader2, Check } from 'lucide-react'
+import { Link2, Wand2, Loader2, Check, AlertTriangle } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { useToast } from '../../state/toast'
 import Dropdown from '../common/Dropdown'
 import SectionCard from './SectionCard'
 
-// Panel de vinculación: nombres de turno sin teléfono ↔ identidades reales (roster).
+// Panel de vinculación: nombres de turno sin teléfono ↔ identidades reales (roster de actividad).
 export default function IdentityLinkPanel() {
   const { suggestions, roster, autoLink, linkOne, isOwnerOrAdmin, demoMode } = useSchedules()
   const { toast } = useToast()
@@ -19,7 +18,10 @@ export default function IdentityLinkPanel() {
   )
   const candidateByKey = useMemo(() => new Map(roster.map((r) => [r.riderKey, r])), [roster])
   const canEdit = isOwnerOrAdmin || demoMode
+  const hasActivity = candidateOptions.length > 0
+  const withSuggestion = useMemo(() => suggestions.filter((u) => u.suggestions.length === 1).length, [suggestions])
 
+  // Todos vinculados.
   if (!suggestions.length) {
     return (
       <SectionCard icon={Link2} title="Vinculación de riders">
@@ -31,10 +33,18 @@ export default function IdentityLinkPanel() {
   }
 
   async function doAuto() {
+    if (!hasActivity) {
+      toast({ type: 'info', title: 'Sube primero la actividad', message: 'Sin CSV de actividad importado no hay teléfonos con los que cruzar los nombres.' })
+      return
+    }
     setBusy(true)
     try {
       const res = await autoLink()
-      toast({ type: res.links_upserted ? 'success' : 'info', title: 'Auto-emparejado', message: res.demo ? 'Modo demo.' : `${res.links_upserted || 0} de ${res.attempted || 0} vinculados automáticamente` })
+      toast({
+        type: res.links_upserted ? 'success' : 'info',
+        title: 'Auto-emparejado',
+        message: res.demo ? 'Modo demo.' : `${res.links_upserted || 0} de ${res.attempted || 0} vinculados automáticamente`,
+      })
     } catch (e) {
       toast({ type: 'error', title: 'Error', message: e.message })
     }
@@ -45,7 +55,7 @@ export default function IdentityLinkPanel() {
     if (!cand) return
     setBusy(true)
     try {
-      await linkOne(name, provider, { rider_key: cand.riderKey ?? cand.rider_key, phone: cand.phone })
+      await linkOne(name, provider, { rider_key: cand.riderKey ?? cand.rider_key, name: cand.name, phone: cand.phone })
       toast({ type: 'success', title: 'Vinculado', message: `${name} → ${cand.name || ''}` })
     } catch (e) {
       toast({ type: 'error', title: 'Error', message: e.message })
@@ -60,16 +70,25 @@ export default function IdentityLinkPanel() {
     <SectionCard
       icon={Link2}
       title="Vinculación de riders"
-      subtitle={`${suggestions.length} sin emparejar`}
+      subtitle={hasActivity ? `${suggestions.length} sin emparejar · ${withSuggestion} con sugerencia` : `${suggestions.length} sin emparejar`}
       right={
         canEdit ? (
-          <button onClick={doAuto} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-110 disabled:opacity-60">
+          <button onClick={doAuto} disabled={busy || !hasActivity} title={hasActivity ? '' : 'Sube primero la actividad'} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} Auto-emparejar
           </button>
         ) : null
       }
       bodyClass="p-0"
     >
+      {!hasActivity && (
+        <div className="flex items-start gap-2.5 border-b border-line bg-amber-500/5 px-4 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <p className="text-xs text-muted">
+            Aún no hay actividad importada. <span className="font-medium text-fg">Sube primero los CSV</span> (arriba):
+            de ahí salen los teléfonos con los que se cruzan estos nombres. Después pulsa <span className="font-medium text-fg">Auto-emparejar</span>.
+          </p>
+        </div>
+      )}
       <div className="divide-y divide-line">
         {suggestions.map((u) => (
           <div key={`${u.provider}|${u.rider_name}`} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
@@ -78,12 +97,13 @@ export default function IdentityLinkPanel() {
               {u.suggestions.length > 0 ? (
                 <p className="truncate text-[11px] text-faint">
                   sugerencia: {u.suggestions[0].name} {u.suggestions[0].phone ? `· ${u.suggestions[0].phone}` : ''}
+                  {u.suggestions[0].method === 'auto_token' ? ' (parcial)' : ''}
                 </p>
               ) : (
-                <p className="text-[11px] text-faint">sin sugerencia automática</p>
+                <p className="text-[11px] text-faint">{hasActivity ? 'sin coincidencia automática' : 'pendiente de actividad'}</p>
               )}
             </div>
-            {canEdit && (
+            {canEdit && hasActivity && (
               <div className="flex shrink-0 items-center gap-2">
                 {u.suggestions.length > 0 && (
                   <button

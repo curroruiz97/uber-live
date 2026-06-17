@@ -13,8 +13,11 @@ const INT_FIELDS = new Set([
   'cancel_trips', 'cancel_not_at_fault_trips',
 ])
 
+// Teléfono normalizado: quita la parte decimal de exportaciones tipo "698870966.0"
+// (float) ANTES de quedarse con los dígitos, para no generar un "0" final espurio
+// que crearía un rider_key duplicado por persona.
 export function digits(s) {
-  return String(s || '').replace(/\D/g, '')
+  return String(s || '').trim().replace(/[.,]\d+$/, '').replace(/\D/g, '')
 }
 const num = (v) => {
   const n = parseFloat(v)

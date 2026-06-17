@@ -51,7 +51,9 @@ def exported_at(name):
 
 
 def digits(s):
-    return re.sub(r"\D", "", s or "")
+    # Quita la parte decimal de exportaciones float ("698870966.0") antes de los dígitos,
+    # para no crear un "0" final espurio (rider_key duplicado por persona).
+    return re.sub(r"\D", "", re.sub(r"[.,]\d+$", "", (s or "").strip()))
 
 
 def num(s):
@@ -112,6 +114,7 @@ def main():
         }
         for f in ID_FIELDS:
             out[f] = a["ident"].get(f, "")
+        out["driver_number"] = phone  # teléfono ya normalizado (sin ".0" ni símbolos)
         for f in SUM_FIELDS:
             v = s[f]
             out[f] = int(round(v)) if f in INT_FIELDS else round(v, 4)

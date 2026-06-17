@@ -64,15 +64,20 @@ export function OrgProvider({ children }) {
     [orgs, currentOrgId],
   )
 
-  // Propaga el org activo a las cabeceras de las Edge Functions + localStorage.
+  // Propaga a las cabeceras de las Edge Functions + localStorage SOLO un org que el
+  // usuario tenga de verdad. Si el guardado está obsoleto (p. ej. su org se borró o
+  // dejó de ser miembro) no se manda nada hasta que reload() lo corrige: así se evita
+  // el 401/403 "No perteneces a esta organización" con una selección caducada.
   useEffect(() => {
-    setActiveOrgId(currentOrgId || '')
+    const valid = orgs.some((o) => o.id === currentOrgId)
+    setActiveOrgId(valid ? currentOrgId : '')
     try {
-      if (currentOrgId) localStorage.setItem(STORAGE_KEY, currentOrgId)
+      if (valid) localStorage.setItem(STORAGE_KEY, currentOrgId)
+      else if (!currentOrgId) localStorage.removeItem(STORAGE_KEY)
     } catch {
       /* ignore */
     }
-  }, [currentOrgId])
+  }, [currentOrgId, orgs])
 
   const switchOrg = useCallback((id) => setCurrentOrgId(id), [])
 

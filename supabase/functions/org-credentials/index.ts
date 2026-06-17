@@ -35,7 +35,9 @@ Deno.serve(async (req) => {
   if (!orgId) return json(400, { error: 'no_org', message: 'Falta la organización (x-org-id).' })
 
   // Solo owner/admin de esa org pueden guardar credenciales.
-  const { data: mem } = await userClient.from('org_members').select('role').eq('org_id', orgId).maybeSingle()
+  // Filtra por el propio usuario: por RLS se ven todas las filas de la org y, con varias,
+  // maybeSingle fallaría (y podría devolver el rol de otro miembro).
+  const { data: mem } = await userClient.from('org_members').select('role').eq('org_id', orgId).eq('user_id', user.id).maybeSingle()
   if (!mem || !['owner', 'admin'].includes(mem.role)) {
     return json(403, { error: 'forbidden', message: 'Solo el propietario o un administrador pueden cambiar las credenciales.' })
   }

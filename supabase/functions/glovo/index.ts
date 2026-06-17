@@ -242,7 +242,9 @@ async function fetchLive(orgId: string, creds: Creds, envName: EnvName, onlyPing
 async function resolveOrgCreds(userClient: any, adminClient: any, requestedOrgId: string) {
   let orgId = requestedOrgId
   if (orgId) {
-    const { data } = await userClient.from('org_members').select('org_id').eq('org_id', orgId).maybeSingle()
+    // limit(1): por RLS un miembro ve TODAS las filas de su org; sin limit, maybeSingle
+    // falla con varias y daría un falso "No perteneces" en orgs con >1 miembro.
+    const { data } = await userClient.from('org_members').select('org_id').eq('org_id', orgId).limit(1).maybeSingle()
     if (!data) {
       const err: any = new Error('No perteneces a esta organización.')
       err.status = 403

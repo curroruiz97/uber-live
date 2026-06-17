@@ -1,60 +1,44 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import clsx from 'clsx'
-import { LayoutDashboard, Users, Trophy, CalendarClock, History, Bell, ShieldCheck, RefreshCw } from 'lucide-react'
+import { LayoutDashboard, Users, Trophy, History, Bell, ShieldCheck, UploadCloud, RefreshCw, Link2 } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
-import { useToast } from '../../state/toast'
 import { selection } from '../../native/haptics'
 import SummaryTab from './SummaryTab'
 import RidersTab from './RidersTab'
 import RankingTab from './RankingTab'
-import SchedulesTab from './SchedulesTab'
 import HistoryTab from './HistoryTab'
 import AlertsTab from './AlertsTab'
+import ImportTab from './ImportTab'
 
 const TABS = [
   { id: 'resumen', label: 'Resumen', Icon: LayoutDashboard },
   { id: 'riders', label: 'Riders', Icon: Users },
   { id: 'ranking', label: 'Ranking', Icon: Trophy },
-  { id: 'horarios', label: 'Horarios', Icon: CalendarClock },
   { id: 'historial', label: 'Historial', Icon: History },
   { id: 'avisos', label: 'Avisos', Icon: Bell },
+  { id: 'importar', label: 'Importar', Icon: UploadCloud },
 ]
 
 export default function ScheduleView() {
   const [tab, setTab] = useState('resumen')
-  const [recomputing, setRecomputing] = useState(false)
-  const { roster, schedules, daily, unseenAlerts, recompute, demoMode, isOwnerOrAdmin } = useSchedules()
-  const { toast } = useToast()
+  const { stats, unseenAlerts, reload, loading } = useSchedules()
+  const [refreshing, setRefreshing] = useState(false)
 
-  const pills = useMemo(
-    () => [
-      { label: 'riders', value: roster.length },
-      { label: 'turnos planificados', value: schedules.length },
-      { label: 'jornadas medidas', value: daily.length },
-    ],
-    [roster, schedules, daily],
-  )
+  const pills = [
+    { label: 'riders', value: stats.riders },
+    { label: 'turnos plan.', value: stats.shifts },
+    { label: 'jornadas medidas', value: stats.days },
+    { label: 'con actividad', value: stats.activityRiders },
+  ]
 
-  async function handleRecompute() {
-    setRecomputing(true)
-    try {
-      const today = new Date()
-      const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-      const res = await recompute(iso(new Date(today.getTime() - 34 * 86400000)), iso(today))
-      toast({
-        type: 'success',
-        title: 'Cumplimiento recalculado',
-        message: res.demo ? 'Datos de demostración actualizados.' : `${res.days ?? 0} jornadas procesadas (últimos 35 días).`,
-      })
-    } catch (e) {
-      toast({ type: 'error', title: 'No se pudo recalcular', message: e.message })
-    }
-    setRecomputing(false)
+  async function refresh() {
+    setRefreshing(true)
+    await reload()
+    setRefreshing(false)
   }
 
   return (
     <div className="space-y-4">
-      {/* Cabecera de la sección */}
       <div className="overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-accent/10 via-panel to-panel p-4 shadow-elev-1 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -63,32 +47,24 @@ export default function ScheduleView() {
             </span>
             <div className="min-w-0">
               <h2 className="text-lg font-bold text-fg">Cumplimiento de Riders</h2>
-              <p className="text-xs text-muted">Asistencia, puntualidad y horas reales frente a los turnos planificados.</p>
+              <p className="text-xs text-muted">Horas trabajadas, productividad y asistencia frente a los turnos planificados.</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            {unseenAlerts > 0 && (
-              <button
-                onClick={() => {
-                  selection()
-                  setTab('avisos')
-                }}
-                className="hidden items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-500/15 dark:text-red-400 sm:inline-flex"
-              >
-                <Bell className="h-3.5 w-3.5" /> {unseenAlerts} sin ver
-              </button>
-            )}
-            {(isOwnerOrAdmin || demoMode) && (
-              <button
-                onClick={handleRecompute}
-                disabled={recomputing}
-                title="Recalcular el cumplimiento de los últimos 35 días a partir de la actividad capturada"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-fg transition hover:bg-inset disabled:opacity-50"
-              >
-                <RefreshCw className={clsx('h-3.5 w-3.5', recomputing && 'animate-spin')} />
-                Recalcular
-              </button>
-            )}
+            <button
+              onClick={refresh}
+              disabled={refreshing || loading}
+              title="Refrescar datos"
+              className="hidden items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-fg transition hover:bg-inset disabled:opacity-50 sm:inline-flex"
+            >
+              <RefreshCw className={clsx('h-3.5 w-3.5', refreshing && 'animate-spin')} /> Refrescar
+            </button>
+            <button
+              onClick={() => { selection(); setTab('importar') }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
+            >
+              <UploadCloud className="h-3.5 w-3.5" /> Subir CSV
+            </button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -97,15 +73,30 @@ export default function ScheduleView() {
               <span className="font-semibold tabular-nums text-fg">{p.value}</span> {p.label}
             </span>
           ))}
+          {stats.unlinked > 0 && (
+            <button
+              onClick={() => { selection(); setTab('importar') }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600 transition hover:bg-amber-500/15 dark:text-amber-400"
+            >
+              <Link2 className="h-3 w-3" /> {stats.unlinked} sin emparejar
+            </button>
+          )}
+          {unseenAlerts > 0 && (
+            <button
+              onClick={() => { selection(); setTab('avisos') }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 px-2.5 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-500/15 dark:text-red-400"
+            >
+              <Bell className="h-3 w-3" /> {unseenAlerts} incidencias
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Sub-pestañas (scroll horizontal en móvil) */}
       <div className="-mx-1 overflow-x-auto px-1 pb-0.5">
         <div className="flex min-w-max gap-1.5 rounded-xl bg-inset p-1.5">
           {TABS.map(({ id, label, Icon }) => {
             const on = tab === id
-            const badge = id === 'avisos' ? unseenAlerts : 0
+            const badge = id === 'avisos' ? unseenAlerts : id === 'importar' ? stats.unlinked : 0
             return (
               <button
                 key={id}
@@ -135,9 +126,9 @@ export default function ScheduleView() {
       {tab === 'resumen' && <SummaryTab />}
       {tab === 'riders' && <RidersTab />}
       {tab === 'ranking' && <RankingTab />}
-      {tab === 'horarios' && <SchedulesTab />}
       {tab === 'historial' && <HistoryTab />}
       {tab === 'avisos' && <AlertsTab />}
+      {tab === 'importar' && <ImportTab />}
     </div>
   )
 }

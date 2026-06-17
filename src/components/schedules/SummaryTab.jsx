@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { CheckCircle2, Clock, UserX, Timer, Users as UsersIcon, TimerReset, TrendingUp, PieChart, Trophy, AlertTriangle } from 'lucide-react'
+import { CheckCircle2, Users as UsersIcon, UserX, Timer, Power, Package, Percent, Gauge, TrendingUp, PieChart, Trophy, AlertTriangle, MapPin } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { aggregateCompliance, buildRanking, statusBreakdown, trendByDate } from '../../domain/compliance'
 import { inRange } from '../../utils/period'
 import KpiCard from '../kpis/KpiCard'
 import EmptyState from '../common/EmptyState'
+import Dropdown from '../common/Dropdown'
 import TrendChart from './TrendChart'
 import StatusDonut from './StatusDonut'
 import Podium from './Podium'
-import Segmented from './Segmented'
 import SectionCard from './SectionCard'
 import RangeControls from './RangeControls'
 import { usePeriodRange, previousWindow } from './usePeriodRange'
@@ -19,32 +19,22 @@ const PERIODS = [
   { id: 'day', label: 'Día' },
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
+  { id: 'all', label: 'Histórico' },
   { id: 'custom', label: 'Fechas' },
 ]
-const PROVIDERS = [
-  { id: 'all', label: 'Todos' },
-  { id: 'uber', label: 'Uber' },
-  { id: 'glovo', label: 'Glovo' },
-]
 
-function ProviderSplit({ split }) {
-  const rows = [
-    { id: 'uber', label: 'Uber' },
-    { id: 'glovo', label: 'Glovo' },
-  ]
-  const has = rows.some((r) => (split[r.id]?.days || 0) > 0)
-  if (!has) return <p className="py-6 text-center text-xs text-muted">Sin datos por proveedor en este periodo.</p>
+function CitySplit({ split }) {
+  const rows = Object.entries(split).filter(([, a]) => a.programmedDays > 0).sort((a, b) => b[1].programmedDays - a[1].programmedDays)
+  if (!rows.length) return <p className="py-6 text-center text-xs text-muted">Sin datos por ciudad en este periodo.</p>
   return (
     <div className="space-y-3.5">
-      {rows.map((r) => {
-        const a = split[r.id] || {}
-        if (!(a.days > 0)) return null
+      {rows.map(([city, a]) => {
         const pct = a.avgCompliancePct || 0
         return (
-          <div key={r.id}>
+          <div key={city}>
             <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="font-medium text-fg">{r.label}</span>
-              <span className={clsx('font-semibold tabular-nums', pctTone(pct))}>{pct}% · {a.days} jorn.</span>
+              <span className="truncate font-medium text-fg">{city || '—'}</span>
+              <span className={clsx('shrink-0 font-semibold tabular-nums', pctTone(pct))}>{pct}% · {a.programmedDays} jorn.</span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-inset">
               <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: pctHex(pct) }} />
@@ -62,7 +52,7 @@ function WorstRow({ r }) {
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-inset text-[11px] font-bold tabular-nums text-muted">{r.rank}</span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-fg">{r.name}</p>
-        <p className="text-[11px] text-faint">{r.attendancePct}% asist · {r.absences} ausencias</p>
+        <p className="text-[11px] text-faint">{r.attendancePct}% asist · {r.absences} ausencias · {r.partials} parciales</p>
       </div>
       <span className={clsx('shrink-0 text-sm font-semibold tabular-nums', pctTone(r.avgCompliancePct))}>{r.avgCompliancePct}%</span>
     </div>
@@ -70,28 +60,18 @@ function WorstRow({ r }) {
 }
 
 export default function SummaryTab() {
-  const { daily, roster, cfg, loading } = useSchedules()
+  const { daily, cfg, loading } = useSchedules()
   const ctl = usePeriodRange('week')
-  const [provider, setProvider] = useState('all')
+  const [city, setCity] = useState('all')
 
-  const metaByKey = useMemo(() => {
-    const m = new Map()
-    for (const r of roster) m.set(r.riderKey, r)
-    return m
-  }, [roster])
-
-  const enriched = useMemo(
-    () =>
-      daily.map((d) => {
-        const meta = metaByKey.get(d.riderKey)
-        return { ...d, provider: d.provider || meta?.provider || null, name: d.name || meta?.name || d.riderKey }
-      }),
-    [daily, metaByKey],
-  )
+  const cityOptions = useMemo(() => {
+    const set = new Set(daily.map((d) => d.city).filter(Boolean))
+    return [{ id: 'all', label: 'Todas las ciudades' }, ...[...set].sort().map((c) => ({ id: c, label: c }))]
+  }, [daily])
 
   const { from, to } = ctl.range
-  const inPeriod = useMemo(() => enriched.filter((d) => inRange(d.date, from, to)), [enriched, from, to])
-  const rows = useMemo(() => (provider === 'all' ? inPeriod : inPeriod.filter((d) => d.provider === provider)), [inPeriod, provider])
+  const inPeriod = useMemo(() => daily.filter((d) => inRange(d.date, from, to)), [daily, from, to])
+  const rows = useMemo(() => (city === 'all' ? inPeriod : inPeriod.filter((d) => d.city === city)), [inPeriod, city])
 
   const agg = useMemo(() => aggregateCompliance(rows), [rows])
   const breakdown = useMemo(() => statusBreakdown(rows), [rows])
@@ -100,42 +80,44 @@ export default function SummaryTab() {
 
   const prev = useMemo(() => {
     const pr = previousWindow(ctl.range)
-    const pRows = enriched.filter((d) => inRange(d.date, pr.from, pr.to) && (provider === 'all' || d.provider === provider))
-    return aggregateCompliance(pRows)
-  }, [enriched, ctl.range, provider])
+    return aggregateCompliance(daily.filter((d) => inRange(d.date, pr.from, pr.to) && (city === 'all' || d.city === city)))
+  }, [daily, ctl.range, city])
 
   const split = useMemo(() => {
     const out = {}
-    for (const p of ['uber', 'glovo']) out[p] = aggregateCompliance(inPeriod.filter((d) => d.provider === p))
-    return out
+    for (const d of inPeriod) {
+      if (!out[d.city]) out[d.city] = []
+      out[d.city].push(d)
+    }
+    return Object.fromEntries(Object.entries(out).map(([c, list]) => [c, aggregateCompliance(list)]))
   }, [inPeriod])
 
   if (loading) return <div className="py-10 text-center text-sm text-muted">Cargando…</div>
 
-  const compHistory = trend.map((t) => t.avgCompliancePct)
-  const attHistory = trend.map((t) => t.attendancePct)
-  const worst = ranking.slice(-5).reverse().filter((r) => r.avgCompliancePct < 90)
-  const dlt = (cur, p) => (prev.days ? cur - p : null)
+  const dlt = (cur, p) => (prev.programmedDays ? cur - p : null)
+  const worst = ranking.filter((r) => r.programmedDays > 0 && r.avgCompliancePct < (cfg.min_compliance_pct ?? 100)).slice(-5).reverse()
 
   return (
     <div className="space-y-4">
       <div className="space-y-2">
         <RangeControls ctl={ctl} presets={PERIODS} />
-        <Segmented options={PROVIDERS} value={provider} onChange={setProvider} fullWidth />
+        <Dropdown value={city} onChange={setCity} options={cityOptions} ariaLabel="Ciudad" className="w-full" />
         <p className="text-right text-xs text-faint">{ctl.label}</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <KpiCard label="Cumplimiento" value={agg.avgCompliancePct} suffix="%" icon={CheckCircle2} accent="emerald" history={compHistory} delta={dlt(agg.avgCompliancePct, prev.avgCompliancePct)} hint={`${agg.days} jornadas`} />
-        <KpiCard label="Puntualidad" value={agg.punctualityPct} suffix="%" icon={Clock} accent="sky" history={attHistory} delta={dlt(agg.punctualityPct, prev.punctualityPct)} hint={`retraso medio ${agg.avgCheckInDelayMin}m`} />
-        <KpiCard label="Asistencia" value={agg.attendancePct} suffix="%" icon={UsersIcon} accent="indigo" delta={dlt(agg.attendancePct, prev.attendancePct)} hint={`${agg.days - agg.absences}/${agg.days} jornadas`} />
-        <KpiCard label="Ausencias" value={agg.absences} icon={UserX} accent="red" hint={`${agg.lates} con retraso`} />
-        <KpiCard label="Horas reales" value={Math.round(agg.workedMinutes / 60)} suffix="h" icon={Timer} accent="amber" hint={`de ${Math.round(agg.plannedMinutes / 60)}h plan`} />
-        <KpiCard label="Retraso medio" value={agg.avgCheckInDelayMin} suffix="m" icon={TimerReset} accent="amber" hint="entrada vs plan" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard label="Cumplimiento" value={agg.avgCompliancePct} suffix="%" icon={CheckCircle2} accent="emerald" history={trend.map((t) => t.avgCompliancePct)} delta={dlt(agg.avgCompliancePct, prev.avgCompliancePct)} hint={`${agg.programmedDays} jornadas`} />
+        <KpiCard label="Asistencia" value={agg.attendancePct} suffix="%" icon={UsersIcon} accent="sky" history={trend.map((t) => t.attendancePct)} delta={dlt(agg.attendancePct, prev.attendancePct)} hint={`${agg.present}/${agg.programmedDays}`} />
+        <KpiCard label="Horas activas" value={agg.activeHours} decimals={1} suffix="h" icon={Timer} accent="amber" delta={dlt(agg.activeHours, prev.activeHours)} hint={`de ${agg.plannedHours}h plan`} />
+        <KpiCard label="Horas online" value={agg.onlineHours} decimals={1} suffix="h" icon={Power} accent="indigo" delta={dlt(agg.onlineHours, prev.onlineHours)} hint="conectado" />
+        <KpiCard label="Viajes" value={agg.trips} icon={Package} accent="emerald" delta={dlt(agg.trips, prev.trips)} hint={`${agg.lateDeliveries} tarde`} />
+        <KpiCard label="Aceptación" value={agg.acceptanceRatePct ?? 0} suffix="%" icon={Percent} accent="sky" hint={`cancel. ${agg.cancelRatePct}%`} />
+        <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint="viajes/hora activa" />
+        <KpiCard label="Ausencias" value={agg.absences} icon={UserX} accent="red" hint={`${agg.partials} parciales · ${agg.justifiedDays} justif.`} />
       </div>
 
       {rows.length === 0 ? (
-        <EmptyState icon={TrendingUp} title="Sin datos en este periodo" hint="Sube horarios y deja que el sistema registre la actividad para ver el cumplimiento." />
+        <EmptyState icon={TrendingUp} title="Sin datos en este periodo" hint="Sube los CSV de actividad para cruzarlos con los turnos planificados." />
       ) : (
         <>
           <SectionCard icon={TrendingUp} title="Tendencia de cumplimiento" subtitle={`media diaria · umbral ${cfg.min_compliance_pct}%`}>
@@ -146,8 +128,8 @@ export default function SummaryTab() {
             <SectionCard icon={PieChart} title="Distribución por estado">
               <StatusDonut breakdown={breakdown} />
             </SectionCard>
-            <SectionCard icon={UsersIcon} title="Por proveedor">
-              <ProviderSplit split={split} />
+            <SectionCard icon={MapPin} title="Por ciudad">
+              <CitySplit split={split} />
             </SectionCard>
           </div>
 
@@ -159,7 +141,7 @@ export default function SummaryTab() {
             </SectionCard>
             <SectionCard icon={AlertTriangle} title="Requieren atención" bodyClass="py-1">
               {worst.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted">Todos por encima del 90%. 🎉</p>
+                <p className="py-6 text-center text-xs text-muted">Todos cumplen el umbral. 🎉</p>
               ) : (
                 <div className="divide-y divide-line">
                   {worst.map((r) => (

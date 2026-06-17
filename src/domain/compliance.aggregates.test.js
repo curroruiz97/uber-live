@@ -1,66 +1,102 @@
 import { describe, it, expect } from 'vitest'
-import { statusBreakdown, trendByDate, buildRiderStats } from './compliance'
+import {
+  aggregateCompliance,
+  statusBreakdown,
+  trendByDate,
+  buildRiderStats,
+  buildRanking,
+  rollupByGranularity,
+  deriveAlerts,
+} from './compliance'
 
-// Filas diarias mínimas para probar los agregados (no dependen del cálculo, solo de la forma).
+// Filas diarias con la forma nueva (estados v2 + métricas crudas).
+const row = (over = {}) => ({
+  riderKey: 'a', name: 'Ana', provider: 'uber', date: '2026-06-01', scheduled: true, attended: true,
+  plannedMin: 240, workedMin: 240, compliancePct: 100, status: 'cumple', absenceTipo: null,
+  onlineHours: 4, activeHours: 4, openHours: 1, enrouteP2Hours: 1, ontripP3Hours: 1, unavailableHours: 0,
+  trips: 10, singleTrips: 8, lateP2: 0, lateP3: 0, accept: 10, reject: 0, cancel: 0, cancelNAF: 0,
+  p2Km: 5, p2Min: 50, p3Km: 5, p3Min: 50, totalKm: 10, totalMin: 100, ...over,
+})
+
 const rows = [
-  { riderKey: 'a', name: 'Ana', provider: 'uber', date: '2026-06-01', plannedMinutes: 240, workedMinutes: 240, checkInDelayMin: 0, attended: true, late: false, compliancePct: 100, status: 'cumple' },
-  { riderKey: 'a', name: 'Ana', provider: 'uber', date: '2026-06-02', plannedMinutes: 240, workedMinutes: 200, checkInDelayMin: 12, attended: true, late: true, compliancePct: 80, status: 'tarde' },
-  { riderKey: 'b', name: 'Beto', provider: 'glovo', date: '2026-06-01', plannedMinutes: 300, workedMinutes: 0, checkInDelayMin: null, attended: false, late: false, compliancePct: 0, status: 'ausente' },
-  { riderKey: 'b', name: 'Beto', provider: 'glovo', date: '2026-06-02', plannedMinutes: 300, workedMinutes: 150, checkInDelayMin: 2, attended: true, late: false, compliancePct: 50, status: 'incompleto' },
+  row({ riderKey: 'a', date: '2026-06-01', status: 'cumple', compliancePct: 100, activeHours: 4, trips: 10, accept: 9, reject: 1 }),
+  row({ riderKey: 'a', date: '2026-06-02', status: 'parcial', compliancePct: 60, workedMin: 144, activeHours: 2.4, trips: 6, accept: 6, reject: 0 }),
+  row({ riderKey: 'b', name: 'Beto', provider: 'glovo', date: '2026-06-01', status: 'ausente', attended: false, workedMin: 0, compliancePct: 0, activeHours: 0, trips: 0, accept: 0, reject: 0 }),
+  row({ riderKey: 'b', name: 'Beto', provider: 'glovo', date: '2026-06-02', status: 'justificado', attended: false, workedMin: 0, compliancePct: null, activeHours: 0, trips: 0, accept: 0, reject: 0, absenceTipo: 'vacaciones' }),
+  row({ riderKey: 'c', name: 'Caro', provider: 'glovo', date: '2026-06-01', scheduled: false, status: 'extra', plannedMin: 0, compliancePct: null, activeHours: 3, trips: 5, accept: 5, reject: 0 }),
 ]
 
-describe('statusBreakdown', () => {
-  it('cuenta cada estado y el total', () => {
-    const b = statusBreakdown(rows)
-    expect(b.total).toBe(4)
-    expect(b.cumple).toBe(1)
-    expect(b.tarde).toBe(1)
-    expect(b.incompleto).toBe(1)
-    expect(b.ausente).toBe(1)
+describe('aggregateCompliance', () => {
+  it('asistencia excluye justificados y extras del denominador', () => {
+    const a = aggregateCompliance(rows)
+    expect(a.programmedDays).toBe(3) // 2 de Ana + 1 ausente de Beto
+    expect(a.justifiedDays).toBe(1)
+    expect(a.extraDays).toBe(1)
+    expect(a.attendancePct).toBe(67) // 2 presentes / 3 programados
   })
+  it('tasa de aceptación = accept/(accept+reject)', () => {
+    expect(aggregateCompliance([row({ accept: 9, reject: 1 })]).acceptanceRatePct).toBe(90)
+  })
+  it('productividad = viajes/hora activa', () => {
+    expect(aggregateCompliance([row({ trips: 10, activeHours: 4 })]).productivity).toBe(2.5)
+  })
+  it('conjunto vacío devuelve ceros', () => {
+    const a = aggregateCompliance([])
+    expect(a.attendancePct).toBe(0)
+    expect(a.trips).toBe(0)
+  })
+})
 
+describe('statusBreakdown', () => {
+  it('cuenta cada estado v2 y el total', () => {
+    const b = statusBreakdown(rows)
+    expect(b).toMatchObject({ total: 5, cumple: 1, parcial: 1, ausente: 1, justificado: 1, extra: 1 })
+  })
   it('no rompe con lista vacía', () => {
-    expect(statusBreakdown([])).toEqual({ cumple: 0, tarde: 0, incompleto: 0, ausente: 0, total: 0 })
+    expect(statusBreakdown([])).toMatchObject({ total: 0, cumple: 0 })
   })
 })
 
 describe('trendByDate', () => {
-  it('agrupa por fecha ordenada y promedia el cumplimiento', () => {
-    const t = trendByDate(rows)
-    expect(t).toHaveLength(2)
-    expect(t[0].date).toBe('2026-06-01')
-    expect(t[1].date).toBe('2026-06-02')
-    // 2026-06-01: cumple 100 + ausente 0 => media 50; asistencia 1/2 = 50%
-    expect(t[0].avgCompliancePct).toBe(50)
-    expect(t[0].attendancePct).toBe(50)
-    expect(t[0].absences).toBe(1)
-    expect(t[0].total).toBe(2)
-    // 2026-06-02: 80 + 50 => media 65
-    expect(t[1].avgCompliancePct).toBe(65)
+  it('agrupa por fecha en orden ascendente', () => {
+    expect(trendByDate(rows).map((d) => d.date)).toEqual(['2026-06-01', '2026-06-02'])
   })
 })
 
 describe('buildRiderStats', () => {
-  it('agrega por rider con serie y último estado, ordenado por nombre', () => {
-    const meta = new Map([
-      ['a', { name: 'Ana', provider: 'uber', phone: '+34600000001', vehicleType: 'Moto' }],
-      ['b', { name: 'Beto', provider: 'glovo', phone: '+34600000002', vehicleType: 'Bici' }],
-    ])
-    const s = buildRiderStats(rows, meta)
-    expect(s).toHaveLength(2)
-    expect(s[0].name).toBe('Ana')
-    expect(s[0].provider).toBe('uber')
-    expect(s[0].trend).toEqual([100, 80]) // ordenado por fecha asc
-    expect(s[0].lastStatus).toBe('tarde')
-    expect(s[0].lastDate).toBe('2026-06-02')
-    expect(s[0].days).toBe(2)
-    expect(s[1].name).toBe('Beto')
-    expect(s[1].absences).toBe(1)
+  it('una entrada por rider, ordenada por nombre', () => {
+    expect(buildRiderStats(rows).map((r) => r.name)).toEqual(['Ana', 'Beto', 'Caro'])
   })
+})
 
-  it('usa el nombre de la fila si no hay meta', () => {
-    const s = buildRiderStats(rows)
-    const ana = s.find((r) => r.riderKey === 'a')
-    expect(ana.name).toBe('Ana')
+describe('buildRanking', () => {
+  it('ordena por % de cumplimiento; rider con datos por encima del ausente', () => {
+    const r = buildRanking(rows)
+    expect(r[0].rank).toBe(1)
+    const ana = r.find((x) => x.riderKey === 'a')
+    const beto = r.find((x) => x.riderKey === 'b')
+    expect(ana.rank).toBeLessThan(beto.rank)
+  })
+})
+
+describe('rollupByGranularity', () => {
+  it('agrupa por mes', () => {
+    const m = rollupByGranularity([row({ date: '2026-06-01' }), row({ date: '2026-06-15' }), row({ date: '2026-07-02' })], 'month')
+    expect(m.map((b) => b.bucketKey)).toEqual(['2026-06', '2026-07'])
+  })
+  it('agrupa por semana (lunes)', () => {
+    const w = rollupByGranularity([row({ date: '2026-06-01' }), row({ date: '2026-06-03' }), row({ date: '2026-06-08' })], 'week', { week_starts_on: 1 })
+    expect(w).toHaveLength(2)
+    expect(w[0].bucketKey).toBe('2026-06-01')
+  })
+})
+
+describe('deriveAlerts', () => {
+  it('genera ausencia (critical) y parcial (warning)', () => {
+    const al = deriveAlerts(rows)
+    const types = al.map((a) => a.type)
+    expect(types).toContain('ausente')
+    expect(types).toContain('parcial')
+    expect(al.find((a) => a.type === 'ausente').severity).toBe('critical')
   })
 })

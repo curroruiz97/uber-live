@@ -14,16 +14,20 @@ export default function SchedulesSection() {
   const ro = !isOwnerOrAdmin
 
   const [tz, setTz] = useState(cfg.timezone || 'Europe/Madrid')
-  const [graceIn, setGraceIn] = useState(String(cfg.grace_in_min ?? 5))
-  const [graceOut, setGraceOut] = useState(String(cfg.grace_out_min ?? 5))
-  const [minPct, setMinPct] = useState(String(cfg.min_compliance_pct ?? 90))
+  const [hoursMetric, setHoursMetric] = useState(cfg.hours_metric || 'active')
+  const [minPct, setMinPct] = useState(String(cfg.min_compliance_pct ?? 100))
+  const [presence, setPresence] = useState(String(cfg.presence_threshold_hours ?? 0.5))
+  const [targetAccept, setTargetAccept] = useState(String(cfg.target_acceptance_pct ?? 90))
+  const [maxCancel, setMaxCancel] = useState(String(cfg.max_cancel_pct ?? 5))
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setTz(cfg.timezone || 'Europe/Madrid')
-    setGraceIn(String(cfg.grace_in_min ?? 5))
-    setGraceOut(String(cfg.grace_out_min ?? 5))
-    setMinPct(String(cfg.min_compliance_pct ?? 90))
+    setHoursMetric(cfg.hours_metric || 'active')
+    setMinPct(String(cfg.min_compliance_pct ?? 100))
+    setPresence(String(cfg.presence_threshold_hours ?? 0.5))
+    setTargetAccept(String(cfg.target_acceptance_pct ?? 90))
+    setMaxCancel(String(cfg.max_cancel_pct ?? 5))
   }, [cfg])
 
   async function save() {
@@ -31,11 +35,13 @@ export default function SchedulesSection() {
     try {
       await saveCfg({
         timezone: tz,
-        grace_in_min: Math.max(0, Number(graceIn) || 0),
-        grace_out_min: Math.max(0, Number(graceOut) || 0),
-        min_compliance_pct: Math.min(100, Math.max(0, Number(minPct) || 0)),
+        hours_metric: hoursMetric === 'online' ? 'online' : 'active',
+        min_compliance_pct: Math.min(200, Math.max(0, Number(minPct) || 0)),
+        presence_threshold_hours: Math.max(0, Number(presence) || 0),
+        target_acceptance_pct: Math.min(100, Math.max(0, Number(targetAccept) || 0)),
+        max_cancel_pct: Math.min(100, Math.max(0, Number(maxCancel) || 0)),
       })
-      toast({ type: 'success', title: 'Configuración de horarios guardada' })
+      toast({ type: 'success', title: 'Configuración de cumplimiento guardada' })
     } catch (e) {
       toast({ type: 'error', title: 'No se pudo guardar', message: e.message })
     }
@@ -45,12 +51,25 @@ export default function SchedulesSection() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Define cómo se mide el cumplimiento de horarios de tus riders: zona horaria, márgenes de
-        cortesía y umbral mínimo de cumplimiento.
+        Define cómo se mide el cumplimiento: qué horas cuentan, el umbral para considerar un turno cumplido
+        y los objetivos de calidad. Se aplica al cálculo diario, semanal y mensual.
       </p>
 
-      <SettingsCard icon={CalendarClock} title="Cumplimiento de horarios" subtitle="Reglas que aplica el cálculo diario, semanal y mensual">
+      <SettingsCard icon={CalendarClock} title="Cumplimiento de riders" subtitle="Reglas del cruce turnos × actividad real">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted">Horas que puntúan</label>
+            <select
+              value={hoursMetric}
+              onChange={(e) => setHoursMetric(e.target.value)}
+              disabled={ro}
+              className="w-full rounded-lg border border-line bg-inset px-3 py-2.5 text-sm text-fg outline-none focus:border-accent/60 disabled:opacity-60"
+            >
+              <option value="active">Horas activas (disponible + en ruta + en entrega)</option>
+              <option value="online">Horas online (todo el tiempo conectado)</option>
+            </select>
+            <p className="mt-1 text-[11px] text-faint">Se muestran ambas; esta decide el estado (cumple/parcial).</p>
+          </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted">Zona horaria</label>
             <select
@@ -62,9 +81,10 @@ export default function SchedulesSection() {
               {TIMEZONES.map((z) => <option key={z} value={z}>{z}</option>)}
             </select>
           </div>
-          <SettingsField label="Umbral mínimo de cumplimiento (%)" type="number" value={minPct} onChange={setMinPct} disabled={ro} hint="Por debajo se marca como incompleto" />
-          <SettingsField label="Margen de cortesía entrada (min)" type="number" value={graceIn} onChange={setGraceIn} disabled={ro} hint="Minutos de retraso que se toleran sin marcar 'tarde'" />
-          <SettingsField label="Margen de cortesía salida (min)" type="number" value={graceOut} onChange={setGraceOut} disabled={ro} hint="Minutos antes del fin que se toleran" />
+          <SettingsField label="Umbral de cumplimiento (%)" type="number" value={minPct} onChange={setMinPct} disabled={ro} hint="% de horas del turno para 'cumple' (100 = muy estricto)" />
+          <SettingsField label="Horas mínimas de presencia" type="number" value={presence} onChange={setPresence} disabled={ro} hint="Por debajo se considera 'ausente'" />
+          <SettingsField label="Objetivo de aceptación (%)" type="number" value={targetAccept} onChange={setTargetAccept} disabled={ro} hint="Avisa si la aceptación diaria baja de este valor" />
+          <SettingsField label="Máx. cancelación (%)" type="number" value={maxCancel} onChange={setMaxCancel} disabled={ro} hint="Avisa si las cancelaciones superan este %" />
         </div>
         {!ro && (
           <div className="mt-4">

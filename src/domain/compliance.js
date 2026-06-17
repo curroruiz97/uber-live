@@ -1,182 +1,346 @@
-// Reglas puras de cumplimiento de horarios. Sin React, sin red: solo cálculo, para
-// poder testearlas a fondo (los números de cumplimiento no pueden fallar nunca).
+// Reglas puras de cumplimiento de riders v2. Sin React, sin red: solo cálculo, para
+// poder testearlas a fondo. Modelo: PRESENCIA + HORAS TRABAJADAS + PRODUCTIVIDAD.
 //
-// Convención de tiempos: las marcas reales se guardan en UTC (epoch ms). Las
-// comparaciones de "hora" se hacen contra los horarios planificados, que ya vienen
-// como instantes absolutos (planned_start/planned_end en UTC tras convertir desde la
-// hora local de la org al subir). Aquí trabajamos con epoch ms en ambos lados.
+// La actividad real viene del CSV diario (formato COURIER_DAILY) con AGREGADOS por día
+// (no hay marcas por evento), así que NO se mide puntualidad al minuto. Se cruzan los
+// turnos planificados (shift_plans, semanales recurrentes) con la actividad real por día.
 
+// Estados de cumplimiento de un día.
 export const COMPLIANCE_STATUS = {
   cumple: { id: 'cumple', label: 'Cumple', tone: 'emerald' },
-  tarde: { id: 'tarde', label: 'Tarde', tone: 'amber' },
-  incompleto: { id: 'incompleto', label: 'Incompleto', tone: 'amber' },
+  parcial: { id: 'parcial', label: 'Parcial', tone: 'amber' },
   ausente: { id: 'ausente', label: 'Ausente', tone: 'red' },
+  justificado: { id: 'justificado', label: 'Justificado', tone: 'sky' },
+  extra: { id: 'extra', label: 'Extra', tone: 'violet' },
 }
+export const STATUS_LIST = ['cumple', 'parcial', 'ausente', 'justificado', 'extra']
 
 export const ALERT_TYPE = {
-  ausencia: { id: 'ausencia', label: 'Ausencia', severity: 'critical' },
-  tarde: { id: 'tarde', label: 'Llegó tarde', severity: 'warning' },
-  salida_anticipada: { id: 'salida_anticipada', label: 'Salida anticipada', severity: 'warning' },
-  jornada_incompleta: { id: 'jornada_incompleta', label: 'Jornada incompleta', severity: 'warning' },
+  ausente: { id: 'ausente', label: 'Ausencia', severity: 'critical' },
+  parcial: { id: 'parcial', label: 'Jornada parcial', severity: 'warning' },
+  baja_aceptacion: { id: 'baja_aceptacion', label: 'Aceptación baja', severity: 'warning' },
+  cancelaciones: { id: 'cancelaciones', label: 'Cancelaciones altas', severity: 'warning' },
 }
 
-const DEFAULT_CFG = { grace_in_min: 5, grace_out_min: 5, min_compliance_pct: 90 }
-
-function minutesBetween(aMs, bMs) {
-  return Math.round((bMs - aMs) / 60000)
+export const DEFAULT_CFG = {
+  timezone: 'Europe/Madrid',
+  week_starts_on: 1,
+  hours_metric: 'active', // métrica que puntúa: 'active' | 'online'
+  min_compliance_pct: 100, // % de horas planificadas para considerar "cumple"
+  presence_threshold_hours: 0.5, // horas mínimas para contar como presente
+  target_acceptance_pct: 90,
+  max_cancel_pct: 5,
 }
 
-// Calcula el cumplimiento de UN turno frente a la actividad real de ese día.
-// schedule: { plannedStart, plannedEnd, plannedMinutes }   (epoch ms / min)
-// actual:   { firstOnlineAt, lastOnlineAt, workedMinutes }  (epoch ms / min) | null si no hubo actividad
-// cfg:      { grace_in_min, grace_out_min, min_compliance_pct }
-// Devuelve un registro normalizado de cumplimiento del día.
-export function computeDailyCompliance(schedule, actual, cfg = {}) {
-  const c = { ...DEFAULT_CFG, ...cfg }
-  const plannedMinutes = Math.max(0, schedule.plannedMinutes ?? minutesBetween(schedule.plannedStart, schedule.plannedEnd))
+const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo']
 
-  // Sin actividad => ausente.
-  if (!actual || !actual.firstOnlineAt || (actual.workedMinutes ?? 0) <= 0) {
-    return {
-      plannedMinutes,
-      workedMinutes: 0,
-      checkInDelayMin: null,
-      checkOutEarlyMin: null,
-      attended: false,
-      late: false,
-      compliancePct: 0,
-      status: 'ausente',
+const num = (v) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+const round = (n, d = 0) => {
+  const f = 10 ** d
+  return Math.round((Number(n) || 0) * f) / f
+}
+
+// 'HH:MM' -> minutos desde medianoche.
+function hmToMin(hhmm) {
+  const [h, m] = String(hhmm || '').split(':').map(Number)
+  if (!Number.isFinite(h)) return 0
+  return h * 60 + (Number.isFinite(m) ? m : 0)
+}
+
+// ISO 'YYYY-MM-DD' -> id de día (lunes..domingo).
+export function diaOfIso(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number)
+  const wd = new Date(y, m - 1, d).getDay() // 0=domingo..6=sábado
+  return DIAS[(wd + 6) % 7]
+}
+
+function isoOf(dt) {
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+function addDays(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(y, m - 1, d)
+  dt.setDate(dt.getDate() + n)
+  return isoOf(dt)
+}
+
+// Lista de fechas ISO inclusivas en [from, to].
+export function eachDateIso(from, to) {
+  if (!from || !to || from > to) return []
+  const out = []
+  let cur = from
+  let guard = 0
+  while (cur <= to && guard < 4000) {
+    out.push(cur)
+    cur = addDays(cur, 1)
+    guard += 1
+  }
+  return out
+}
+
+// Mapa `${riderKey}|${date}` -> tipo de ausencia, para [from,to]. Solo ausencias vinculadas.
+export function expandAbsences(absences, from, to) {
+  const map = new Map()
+  for (const a of absences || []) {
+    const key = a.rider_key
+    const tipo = a.tipo
+    const start = a.fecha_inicio
+    if (!key || !tipo || !start) continue
+    const end = a.fecha_fin || (a.dias ? addDays(start, Math.max(0, Number(a.dias) - 1)) : start)
+    let cur = start < from ? from : start
+    const last = end > to ? to : end
+    let guard = 0
+    while (cur <= last && guard < 4000) {
+      map.set(`${key}|${cur}`, tipo)
+      cur = addDays(cur, 1)
+      guard += 1
     }
   }
-
-  const workedMinutes = Math.max(0, actual.workedMinutes ?? 0)
-  const checkInDelayMin = minutesBetween(schedule.plannedStart, actual.firstOnlineAt) // + tarde, - antes
-  const checkOutEarlyMin = minutesBetween(actual.lastOnlineAt, schedule.plannedEnd) // + salió antes
-
-  const late = checkInDelayMin > c.grace_in_min
-  const leftEarly = checkOutEarlyMin > c.grace_out_min
-
-  // % base por minutos trabajados sobre los planificados (acotado a 100).
-  let pct = plannedMinutes > 0 ? Math.min(100, (workedMinutes / plannedMinutes) * 100) : 0
-  // Penalización leve por impuntualidad (entrada tarde), proporcional al retraso.
-  if (late) pct = Math.max(0, pct - Math.min(20, checkInDelayMin - c.grace_in_min))
-  pct = Math.round(pct)
-
-  let status = 'cumple'
-  if (late) status = 'tarde'
-  if (pct < c.min_compliance_pct || leftEarly) status = late ? 'tarde' : 'incompleto'
-  // "tarde" y "incompleto" pueden coexistir; priorizamos mostrar el peor matiz como incompleto si el % cae mucho.
-  if (pct < c.min_compliance_pct && !late) status = 'incompleto'
-
-  return {
-    plannedMinutes,
-    workedMinutes,
-    checkInDelayMin,
-    checkOutEarlyMin,
-    attended: true,
-    late,
-    compliancePct: pct,
-    status,
-  }
+  return map
 }
 
-// Deriva los avisos de un registro de cumplimiento diario.
-export function deriveAlerts(daily) {
-  const alerts = []
-  if (!daily.attended) {
-    alerts.push({ type: 'ausencia', severity: 'critical' })
-    return alerts
+// Expande los turnos semanales a minutos planificados por (riderKey, fecha) en [from,to].
+// Devuelve [{ riderKey, name, provider, city, date, plannedMin, absenceTipo|null }].
+// Excluye turnos sin rider_key (no vinculados): se gestionan aparte en la UI.
+export function expandSchedule(shiftPlans, absences, from, to) {
+  const dates = eachDateIso(from, to)
+  if (!dates.length) return []
+  const absByKeyDate = expandAbsences(absences, from, to)
+  // Agrupa turnos por día de la semana.
+  const byDia = new Map()
+  for (const s of shiftPlans || []) {
+    if (!s.rider_key) continue
+    if (!byDia.has(s.dia)) byDia.set(s.dia, [])
+    byDia.get(s.dia).push(s)
   }
-  if (daily.late) alerts.push({ type: 'tarde', severity: 'warning' })
-  if ((daily.checkOutEarlyMin ?? 0) > 0) alerts.push({ type: 'salida_anticipada', severity: 'warning' })
-  if (daily.status === 'incompleto') alerts.push({ type: 'jornada_incompleta', severity: 'warning' })
-  return alerts
-}
-
-// Agrega varios registros diarios (de un rider o de la flota) en métricas de periodo.
-// rows: [{ riderKey, plannedMinutes, workedMinutes, checkInDelayMin, attended, late, compliancePct, status }]
-export function aggregateCompliance(rows) {
-  const n = rows.length
-  if (!n) {
-    return { days: 0, attendancePct: 0, punctualityPct: 0, avgCompliancePct: 0, plannedMinutes: 0, workedMinutes: 0, avgCheckInDelayMin: 0, absences: 0, lates: 0 }
-  }
-  let attended = 0
-  let punctual = 0
-  let plannedMinutes = 0
-  let workedMinutes = 0
-  let pctSum = 0
-  let delaySum = 0
-  let delayN = 0
-  let absences = 0
-  let lates = 0
-  for (const r of rows) {
-    plannedMinutes += r.plannedMinutes ?? 0
-    workedMinutes += r.workedMinutes ?? 0
-    pctSum += r.compliancePct ?? 0
-    if (r.attended) {
-      attended += 1
-      if (!r.late) punctual += 1
-      if (typeof r.checkInDelayMin === 'number') {
-        delaySum += r.checkInDelayMin
-        delayN += 1
+  const acc = new Map() // `${riderKey}|${date}` -> entry
+  for (const date of dates) {
+    const dia = diaOfIso(date)
+    const plans = byDia.get(dia)
+    if (!plans) continue
+    for (const s of plans) {
+      let mins = hmToMin(s.hora_fin) - hmToMin(s.hora_inicio)
+      if (mins < 0) mins += 1440 // turno que cruza medianoche
+      if (mins <= 0) continue
+      const key = `${s.rider_key}|${date}`
+      const cur = acc.get(key)
+      if (cur) {
+        cur.plannedMin += mins
+      } else {
+        acc.set(key, {
+          riderKey: s.rider_key,
+          name: s.rider_name,
+          provider: s.provider || 'uber',
+          city: s.city || null,
+          date,
+          plannedMin: mins,
+          absenceTipo: absByKeyDate.get(key) || null,
+        })
       }
-    } else {
-      absences += 1
     }
-    if (r.late) lates += 1
+  }
+  return [...acc.values()]
+}
+
+// Extrae las métricas (camelCase) de una fila de rider_daily_stats (snake_case) o ceros.
+export function metricsFrom(s) {
+  if (!s) {
+    return {
+      onlineHours: 0, activeHours: 0, openHours: 0, enrouteP2Hours: 0, ontripP3Hours: 0, unavailableHours: 0,
+      trips: 0, singleTrips: 0, lateP2: 0, lateP3: 0, accept: 0, reject: 0, cancel: 0, cancelNAF: 0,
+      p2Km: 0, p2Min: 0, p3Km: 0, p3Min: 0, totalKm: 0, totalMin: 0,
+    }
   }
   return {
-    days: n,
-    attendancePct: Math.round((attended / n) * 100),
-    punctualityPct: attended ? Math.round((punctual / attended) * 100) : 0,
-    avgCompliancePct: Math.round(pctSum / n),
-    plannedMinutes,
-    workedMinutes,
-    avgCheckInDelayMin: delayN ? Math.round(delaySum / delayN) : 0,
-    absences,
-    lates,
+    onlineHours: num(s.online_hours), activeHours: num(s.active_hours), openHours: num(s.open_hours),
+    enrouteP2Hours: num(s.enroute_p2_hours), ontripP3Hours: num(s.ontrip_p3_hours), unavailableHours: num(s.unavailable_hours),
+    trips: num(s.num_of_trips), singleTrips: num(s.single_trips_total), lateP2: num(s.late_p2_trips), lateP3: num(s.late_p3_trips),
+    accept: num(s.accept_trips), reject: num(s.reject_trips), cancel: num(s.cancel_trips), cancelNAF: num(s.cancel_not_at_fault_trips),
+    p2Km: num(s.p2_km), p2Min: num(s.p2_min), p3Km: num(s.p3_km), p3Min: num(s.p3_min), totalKm: num(s.total_km), totalMin: num(s.total_min),
   }
 }
 
-// Construye un ranking de riders a partir de registros diarios agrupados por rider.
-// rows: [{ riderKey, name, ...daily }]. Devuelve [{ riderKey, name, ...aggregate }] ordenado.
-export function buildRanking(rows) {
-  const byRider = new Map()
-  for (const r of rows) {
-    const k = r.riderKey
-    if (!byRider.has(k)) byRider.set(k, { riderKey: k, name: r.name || k, rows: [] })
-    byRider.get(k).rows.push(r)
+function workedHoursOf(m, cfg) {
+  return cfg.hours_metric === 'online' ? m.onlineHours : m.activeHours
+}
+
+// Cumplimiento de UN día. plannedMin: minutos planificados (0 = no programado).
+// actual: fila rider_daily_stats | null. absenceTipo: tipo si el día está cubierto por ausencia.
+export function computeDayCompliance(plannedMin, actual, cfg = DEFAULT_CFG, absenceTipo = null) {
+  const c = { ...DEFAULT_CFG, ...cfg }
+  const m = metricsFrom(actual)
+  const workedH = workedHoursOf(m, c)
+  const workedMin = Math.round(workedH * 60)
+  const threshold = c.presence_threshold_hours ?? 0.5
+
+  let status
+  let compliancePct = null
+  let attended = false
+  const scheduled = plannedMin > 0
+
+  if (scheduled) {
+    if (absenceTipo) {
+      status = 'justificado'
+    } else if (!actual || workedH < threshold) {
+      status = 'ausente'
+      compliancePct = 0
+    } else {
+      attended = true
+      compliancePct = Math.min(100, Math.round((workedMin / plannedMin) * 100))
+      status = compliancePct >= (c.min_compliance_pct ?? 100) ? 'cumple' : 'parcial'
+    }
+  } else {
+    // Sin turno planificado ese día: solo cuenta si realmente trabajó (extra).
+    if (workedH >= threshold) {
+      status = 'extra'
+      attended = true
+    } else {
+      status = 'no_programado'
+    }
   }
-  const ranking = [...byRider.values()].map((g) => ({
-    riderKey: g.riderKey,
-    name: g.name,
-    ...aggregateCompliance(g.rows),
-  }))
-  // Orden: mayor % de cumplimiento; desempate por puntualidad y menor retraso medio.
+
+  // % real sin tope (para mostrar sobre-cumplimiento), separado del usado en medias.
+  const rawPct = scheduled && plannedMin > 0 ? Math.round((workedMin / plannedMin) * 100) : null
+
+  return { status, scheduled, attended, plannedMin, workedMin, compliancePct, rawPct, absenceTipo: absenceTipo || null, ...m }
+}
+
+// Produce el array `daily` cruzando turnos + ausencias + actividad real en [from,to].
+// shiftPlans, absences: tablas completas. stats: rider_daily_stats acotado al rango.
+export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_CFG) {
+  const planned = expandSchedule(shiftPlans, absences, from, to)
+  const statByKey = new Map()
+  for (const s of stats || []) statByKey.set(`${s.rider_key}|${s.work_date}`, s)
+  const seen = new Set()
+  const out = []
+
+  for (const p of planned) {
+    const key = `${p.riderKey}|${p.date}`
+    seen.add(key)
+    const a = statByKey.get(key) || null
+    const comp = computeDayCompliance(p.plannedMin, a, cfg, p.absenceTipo)
+    out.push({
+      riderKey: p.riderKey, name: p.name, provider: p.provider, city: a?.city || p.city, date: p.date, ...comp,
+    })
+  }
+
+  // Días con actividad pero sin turno planificado -> extra (si supera el umbral).
+  for (const s of stats || []) {
+    if (!s.work_date || s.work_date < from || s.work_date > to) continue
+    const key = `${s.rider_key}|${s.work_date}`
+    if (seen.has(key)) continue
+    const comp = computeDayCompliance(0, s, cfg, null)
+    if (comp.status === 'no_programado') continue
+    out.push({
+      riderKey: s.rider_key, name: s.driver_name || s.rider_key, provider: s.source_provider || 'glovo',
+      city: s.city || null, date: s.work_date, ...comp,
+    })
+  }
+  return out
+}
+
+// Agrega un conjunto de filas diarias (de un rider o de la flota) en métricas de periodo.
+export function aggregateCompliance(rows) {
+  const programmed = []
+  let justified = 0
+  let extras = 0
+  const acc = {
+    onlineHours: 0, activeHours: 0, openHours: 0, trips: 0, accept: 0, reject: 0, cancel: 0,
+    lateDeliveries: 0, totalKm: 0, plannedMin: 0, workedMin: 0,
+  }
+  for (const r of rows || []) {
+    acc.onlineHours += r.onlineHours || 0
+    acc.activeHours += r.activeHours || 0
+    acc.openHours += r.openHours || 0
+    acc.trips += r.trips || 0
+    acc.accept += r.accept || 0
+    acc.reject += r.reject || 0
+    acc.cancel += r.cancel || 0
+    acc.lateDeliveries += (r.lateP2 || 0) + (r.lateP3 || 0)
+    acc.totalKm += r.totalKm || 0
+    acc.workedMin += r.workedMin || 0
+    if (r.status === 'justificado') justified += 1
+    else if (r.status === 'extra') extras += 1
+    else if (r.scheduled) {
+      programmed.push(r)
+      acc.plannedMin += r.plannedMin || 0
+    }
+  }
+  const progN = programmed.length
+  const present = programmed.filter((r) => r.attended).length
+  const absences = programmed.filter((r) => r.status === 'ausente').length
+  const partials = programmed.filter((r) => r.status === 'parcial').length
+  const fulfilled = programmed.filter((r) => r.status === 'cumple').length
+  const pctSum = programmed.reduce((s, r) => s + (r.compliancePct || 0), 0)
+  const assigned = acc.accept + acc.reject
+
+  return {
+    days: (rows || []).length,
+    programmedDays: progN,
+    justifiedDays: justified,
+    extraDays: extras,
+    present,
+    absences,
+    partials,
+    fulfilled,
+    attendancePct: progN ? round((present / progN) * 100) : 0,
+    avgCompliancePct: progN ? round(pctSum / progN) : 0,
+    plannedHours: round(acc.plannedMin / 60, 1),
+    workedHours: round(acc.workedMin / 60, 1),
+    onlineHours: round(acc.onlineHours, 1),
+    activeHours: round(acc.activeHours, 1),
+    openHours: round(acc.openHours, 1),
+    trips: acc.trips,
+    lateDeliveries: acc.lateDeliveries,
+    cancels: acc.cancel,
+    acceptanceRatePct: assigned > 0 ? round((acc.accept / assigned) * 100) : null,
+    cancelRatePct: acc.trips + acc.cancel > 0 ? round((acc.cancel / (acc.trips + acc.cancel)) * 100) : 0,
+    productivity: acc.activeHours > 0 ? round(acc.trips / acc.activeHours, 2) : 0,
+    km: round(acc.totalKm, 1),
+  }
+}
+
+// Ranking de riders por % de cumplimiento (desempate: asistencia, productividad).
+export function buildRanking(rows, metaByKey = new Map()) {
+  const byRider = new Map()
+  for (const r of rows || []) {
+    if (!byRider.has(r.riderKey)) byRider.set(r.riderKey, [])
+    byRider.get(r.riderKey).push(r)
+  }
+  const ranking = [...byRider.entries()].map(([riderKey, list]) => {
+    const meta = metaByKey.get(riderKey) || {}
+    return {
+      riderKey,
+      name: meta.name || list[0].name || riderKey,
+      provider: meta.provider || list[0].provider || null,
+      ...aggregateCompliance(list),
+    }
+  })
   ranking.sort(
     (a, b) =>
       b.avgCompliancePct - a.avgCompliancePct ||
-      b.punctualityPct - a.punctualityPct ||
-      a.avgCheckInDelayMin - b.avgCheckInDelayMin,
+      b.attendancePct - a.attendancePct ||
+      b.productivity - a.productivity,
   )
   return ranking.map((r, i) => ({ ...r, rank: i + 1 }))
 }
 
-// Distribución por estado de un conjunto de registros diarios.
-// Devuelve { cumple, tarde, incompleto, ausente, total }.
+// Distribución por estado.
 export function statusBreakdown(rows) {
-  const out = { cumple: 0, tarde: 0, incompleto: 0, ausente: 0, total: rows.length }
-  for (const r of rows) {
+  const out = { cumple: 0, parcial: 0, ausente: 0, justificado: 0, extra: 0, total: (rows || []).length }
+  for (const r of rows || []) {
     if (Object.prototype.hasOwnProperty.call(out, r.status)) out[r.status] += 1
   }
   return out
 }
 
-// Serie temporal agregada por día (para el gráfico de tendencia).
-// Devuelve [{ date, avgCompliancePct, attendancePct, attended, absences, total }] ordenado por fecha ascendente.
+// Serie por fecha (para el gráfico de tendencia).
 export function trendByDate(rows) {
   const byDate = new Map()
-  for (const r of rows) {
+  for (const r of rows || []) {
     if (!byDate.has(r.date)) byDate.set(r.date, [])
     byDate.get(r.date).push(r)
   }
@@ -188,18 +352,19 @@ export function trendByDate(rows) {
         date,
         avgCompliancePct: agg.avgCompliancePct,
         attendancePct: agg.attendancePct,
-        attended: agg.days - agg.absences,
+        activeHours: agg.activeHours,
+        trips: agg.trips,
+        present: agg.present,
         absences: agg.absences,
-        total: agg.days,
+        total: agg.programmedDays,
       }
     })
 }
 
 // Estadísticas por rider para la vista de riders: agregados + serie de % + último estado.
-// metaByKey: Map(riderKey -> { name, provider, phone, vehicleType }). Ordena por nombre.
 export function buildRiderStats(rows, metaByKey = new Map()) {
   const byRider = new Map()
-  for (const r of rows) {
+  for (const r of rows || []) {
     if (!byRider.has(r.riderKey)) byRider.set(r.riderKey, [])
     byRider.get(r.riderKey).push(r)
   }
@@ -214,12 +379,71 @@ export function buildRiderStats(rows, metaByKey = new Map()) {
       provider: meta.provider || list[0].provider || null,
       phone: meta.phone || null,
       vehicleType: meta.vehicleType || null,
+      city: meta.city || list[0].city || null,
       ...agg,
-      trend: sorted.map((d) => d.compliancePct),
+      trend: sorted.filter((d) => d.scheduled && d.status !== 'justificado').map((d) => d.compliancePct || 0),
       lastStatus: last ? last.status : null,
       lastDate: last ? last.date : null,
     }
   })
   stats.sort((a, b) => a.name.localeCompare(b.name))
   return stats
+}
+
+// Agrupa las filas de un rider por granularidad (día/semana/mes) y agrega cada bucket.
+export function rollupByGranularity(rows, granularity = 'day', cfg = DEFAULT_CFG) {
+  const weekStartsOn = cfg.week_starts_on ?? 1
+  const keyOf = (iso) => {
+    if (granularity === 'month') return iso.slice(0, 7)
+    if (granularity === 'week') {
+      const [y, m, d] = iso.split('-').map(Number)
+      const dt = new Date(y, m - 1, d)
+      const diff = (dt.getDay() - weekStartsOn + 7) % 7
+      dt.setDate(dt.getDate() - diff)
+      return isoOf(dt)
+    }
+    return iso
+  }
+  const groups = new Map()
+  for (const r of rows || []) {
+    const k = keyOf(r.date)
+    if (!groups.has(k)) groups.set(k, [])
+    groups.get(k).push(r)
+  }
+  return [...groups.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0))
+    .map(([key, list]) => {
+      const dates = list.map((r) => r.date).sort()
+      return {
+        bucketKey: key,
+        granularity,
+        from: dates[0],
+        to: dates[dates.length - 1],
+        ...aggregateCompliance(list),
+      }
+    })
+}
+
+// Avisos derivados (cliente, sin persistencia) a partir de las filas diarias.
+export function deriveAlerts(rows, cfg = DEFAULT_CFG) {
+  const c = { ...DEFAULT_CFG, ...cfg }
+  const out = []
+  for (const r of rows || []) {
+    if (!r.scheduled) continue
+    if (r.status === 'ausente') {
+      out.push({ id: `${r.riderKey}|${r.date}|ausente`, riderKey: r.riderKey, name: r.name, date: r.date, type: 'ausente', severity: 'critical' })
+    } else if (r.status === 'parcial') {
+      out.push({ id: `${r.riderKey}|${r.date}|parcial`, riderKey: r.riderKey, name: r.name, date: r.date, type: 'parcial', severity: 'warning' })
+    }
+    const assigned = (r.accept || 0) + (r.reject || 0)
+    if (assigned >= 5 && (r.accept / assigned) * 100 < (c.target_acceptance_pct ?? 90)) {
+      out.push({ id: `${r.riderKey}|${r.date}|acept`, riderKey: r.riderKey, name: r.name, date: r.date, type: 'baja_aceptacion', severity: 'warning' })
+    }
+    if ((r.trips || 0) + (r.cancel || 0) >= 5 && (r.cancel / ((r.trips || 0) + r.cancel)) * 100 > (c.max_cancel_pct ?? 5)) {
+      out.push({ id: `${r.riderKey}|${r.date}|cancel`, riderKey: r.riderKey, name: r.name, date: r.date, type: 'cancelaciones', severity: 'warning' })
+    }
+  }
+  // Más recientes primero.
+  out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+  return out
 }

@@ -96,8 +96,8 @@ export default function RidersTab() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-fg">{r.name}</p>
                     <p className="truncate text-[11px] text-faint">
-                      {r.provider ? (r.provider === 'uber' ? 'Uber' : 'Glovo') : '—'}
-                      {r.days ? ` · ${r.days} jornadas` : ''}
+                      {r.city || '—'}
+                      {r.programmedDays ? ` · ${r.programmedDays} jornadas` : ''}
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-muted" />
@@ -115,8 +115,8 @@ export default function RidersTab() {
                     <p className="text-[10px] text-faint">asist.</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold tabular-nums text-fg">{r.punctualityPct}%</p>
-                    <p className="text-[10px] text-faint">puntual</p>
+                    <p className="text-xs font-semibold tabular-nums text-fg">{r.activeHours}h</p>
+                    <p className="text-[10px] text-faint">activas</p>
                   </div>
                   <div>
                     <p className="text-xs font-semibold tabular-nums text-fg">{r.absences}</p>

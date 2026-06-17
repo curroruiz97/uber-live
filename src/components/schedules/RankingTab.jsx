@@ -3,7 +3,7 @@ import clsx from 'clsx'
 import { Trophy, Download } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { buildRanking } from '../../domain/compliance'
-import { inRange, fmtMinutes } from '../../utils/period'
+import { inRange } from '../../utils/period'
 import { downloadCsv } from '../../utils/csv'
 import EmptyState from '../common/EmptyState'
 import SectionCard from './SectionCard'
@@ -30,20 +30,18 @@ export default function RankingTab() {
   const { daily, roster, loading } = useSchedules()
   const ctl = usePeriodRange('month')
 
-  const nameByKey = useMemo(() => {
+  const metaByKey = useMemo(() => {
     const m = new Map()
-    for (const r of roster) m.set(r.riderKey, r.name)
+    for (const r of roster) m.set(r.riderKey, r)
     return m
   }, [roster])
 
   const rows = useMemo(() => {
     const { from, to } = ctl.range
-    return daily
-      .filter((d) => inRange(d.date, from, to))
-      .map((d) => ({ ...d, name: d.name || nameByKey.get(d.riderKey) || d.riderKey }))
-  }, [daily, nameByKey, ctl.range])
+    return daily.filter((d) => inRange(d.date, from, to))
+  }, [daily, ctl.range])
 
-  const ranking = useMemo(() => buildRanking(rows), [rows])
+  const ranking = useMemo(() => buildRanking(rows, metaByKey), [rows, metaByKey])
 
   function exportCsv() {
     downloadCsv(
@@ -53,20 +51,24 @@ export default function RankingTab() {
         { key: 'name', label: 'Rider' },
         { key: 'cumpl', label: 'Cumplimiento %' },
         { key: 'asist', label: 'Asistencia %' },
-        { key: 'punt', label: 'Puntualidad %' },
-        { key: 'retraso', label: 'Retraso medio (min)' },
+        { key: 'acept', label: 'Aceptación %' },
+        { key: 'prod', label: 'Productividad (viajes/h)' },
+        { key: 'viajes', label: 'Viajes' },
+        { key: 'activas', label: 'Horas activas' },
+        { key: 'online', label: 'Horas online' },
         { key: 'aus', label: 'Ausencias' },
-        { key: 'horas', label: 'Horas reales (min)' },
       ],
       ranking.map((r) => ({
         rank: r.rank,
         name: r.name,
         cumpl: r.avgCompliancePct,
         asist: r.attendancePct,
-        punt: r.punctualityPct,
-        retraso: r.avgCheckInDelayMin,
+        acept: r.acceptanceRatePct ?? '',
+        prod: r.productivity,
+        viajes: r.trips,
+        activas: r.activeHours,
+        online: r.onlineHours,
         aus: r.absences,
-        horas: r.workedMinutes,
       })),
     )
   }
@@ -110,9 +112,10 @@ export default function RankingTab() {
                     <th className="px-3 py-2 font-medium">#</th>
                     <th className="px-3 py-2 font-medium">Rider</th>
                     <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Asist.</th>
-                    <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Puntual</th>
-                    <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Retraso</th>
-                    <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Horas</th>
+                    <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Acept.</th>
+                    <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Prod.</th>
+                    <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">Viajes</th>
+                    <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Horas act.</th>
                     <th className="px-3 py-2 text-right font-medium">Cumpl.</th>
                   </tr>
                 </thead>
@@ -124,9 +127,10 @@ export default function RankingTab() {
                       </td>
                       <td className="px-3 py-2 text-sm text-fg">{r.name}</td>
                       <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted sm:table-cell">{r.attendancePct}%</td>
-                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted sm:table-cell">{r.punctualityPct}%</td>
-                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{r.avgCheckInDelayMin}m</td>
-                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{fmtMinutes(r.workedMinutes)}</td>
+                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{r.acceptanceRatePct ?? '—'}{r.acceptanceRatePct != null ? '%' : ''}</td>
+                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{r.productivity}</td>
+                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted lg:table-cell">{r.trips}</td>
+                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted sm:table-cell">{r.activeHours}h</td>
                       <td className={clsx('px-3 py-2 text-right text-sm font-bold tabular-nums', pctTone(r.avgCompliancePct))}>{r.avgCompliancePct}%</td>
                     </tr>
                   ))}

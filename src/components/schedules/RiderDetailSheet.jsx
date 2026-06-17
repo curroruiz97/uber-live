@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { X, Phone, Bike, CheckCircle2, Clock, UserX, Timer, TimerReset } from 'lucide-react'
+import { X, Phone, Bike, MapPin, CheckCircle2, Users as UsersIcon, Timer, Power, Package, Percent, Gauge, UserX } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
-import { aggregateCompliance } from '../../domain/compliance'
-import { fmtMinutes } from '../../utils/period'
+import { aggregateCompliance, rollupByGranularity } from '../../domain/compliance'
 import { pushBackHandler } from '../../native/backStack'
 import ComplianceHeatmap from './ComplianceHeatmap'
 import TrendChart from './TrendChart'
-import { STATUS_META, pctTone, longDate } from './statusMeta'
-
-const PROVIDER_LABEL = { uber: 'Uber', glovo: 'Glovo' }
+import Segmented from './Segmented'
+import { STATUS_META, pctTone, shortDate } from './statusMeta'
 
 function initials(name) {
   return (name || '?').split(' ').slice(0, 2).map((w) => w[0] || '').join('').toUpperCase()
@@ -27,12 +25,28 @@ function Stat({ icon: Icon, label, value, tone }) {
   )
 }
 
+const GRANS = [
+  { id: 'day', label: 'Día' },
+  { id: 'week', label: 'Semana' },
+  { id: 'month', label: 'Mes' },
+]
+
+function bucketLabel(b) {
+  if (b.granularity === 'month') {
+    const [y, m] = b.bucketKey.split('-')
+    return `${['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'][Number(m) - 1]} ${y}`
+  }
+  if (b.granularity === 'week') return `${shortDate(b.from)}–${shortDate(b.to)}`
+  return shortDate(b.bucketKey)
+}
+
 // Ficha de rider: bottom-sheet en móvil, drawer lateral en escritorio.
 export default function RiderDetailSheet({ rider, onClose }) {
   const { daily, cfg } = useSchedules()
   const open = !!rider
   const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
+  const [gran, setGran] = useState('week')
 
   useEffect(() => {
     if (open) {
@@ -68,7 +82,11 @@ export default function RiderDetailSheet({ rider, onClose }) {
   }, [daily, rider])
 
   const agg = useMemo(() => aggregateCompliance(rows), [rows])
-  const trend = useMemo(() => [...rows].reverse().map((d) => ({ date: d.date, value: d.compliancePct })), [rows])
+  const trend = useMemo(
+    () => [...rows].reverse().filter((d) => d.scheduled && d.status !== 'justificado').map((d) => ({ date: d.date, value: d.compliancePct || 0 })),
+    [rows],
+  )
+  const buckets = useMemo(() => rollupByGranularity([...rows].reverse(), gran, cfg).reverse(), [rows, gran, cfg])
 
   if (!mounted || !rider) return null
 
@@ -82,7 +100,7 @@ export default function RiderDetailSheet({ rider, onClose }) {
         className={clsx(
           'absolute flex flex-col bg-panel shadow-elev-3 transition-transform duration-300 ease-spring',
           'inset-x-0 bottom-0 max-h-[90vh] rounded-t-2xl border-t border-line',
-          'md:inset-y-0 md:right-0 md:left-auto md:w-[460px] md:max-h-none md:rounded-none md:border-l md:border-t-0',
+          'md:inset-y-0 md:right-0 md:left-auto md:w-[480px] md:max-h-none md:rounded-none md:border-l md:border-t-0',
           visible ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-y-0 md:translate-x-full',
         )}
       >
@@ -96,7 +114,7 @@ export default function RiderDetailSheet({ rider, onClose }) {
               <div className="min-w-0">
                 <h2 className="truncate text-base font-semibold text-fg">{rider.name}</h2>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-faint">
-                  {rider.provider && <span>{PROVIDER_LABEL[rider.provider] || rider.provider}</span>}
+                  {(rider.city || agg) && rider.city && <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{rider.city}</span>}
                   {rider.vehicleType && <span className="inline-flex items-center gap-1"><Bike className="h-3 w-3" />{rider.vehicleType}</span>}
                   {rider.phone && <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{rider.phone}</span>}
                 </div>
@@ -109,12 +127,14 @@ export default function RiderDetailSheet({ rider, onClose }) {
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <Stat icon={CheckCircle2} label="Cumplimiento" value={`${agg.avgCompliancePct}%`} tone={pctTone(agg.avgCompliancePct)} />
-            <Stat icon={Clock} label="Puntualidad" value={`${agg.punctualityPct}%`} />
-            <Stat icon={CheckCircle2} label="Asistencia" value={`${agg.attendancePct}%`} />
-            <Stat icon={Timer} label="Horas reales" value={fmtMinutes(agg.workedMinutes)} />
-            <Stat icon={TimerReset} label="Retraso medio" value={`${agg.avgCheckInDelayMin}m`} />
+            <Stat icon={UsersIcon} label="Asistencia" value={`${agg.attendancePct}%`} />
+            <Stat icon={Timer} label="Horas activas" value={`${agg.activeHours}h`} />
+            <Stat icon={Power} label="Horas online" value={`${agg.onlineHours}h`} />
+            <Stat icon={Package} label="Viajes" value={agg.trips} />
+            <Stat icon={Percent} label="Aceptación" value={agg.acceptanceRatePct != null ? `${agg.acceptanceRatePct}%` : '—'} />
+            <Stat icon={Gauge} label="Productividad" value={agg.productivity} />
             <Stat icon={UserX} label="Ausencias" value={agg.absences} />
           </div>
 
@@ -131,6 +151,37 @@ export default function RiderDetailSheet({ rider, onClose }) {
           </div>
 
           <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold text-muted">Desglose</h3>
+              <Segmented options={GRANS} value={gran} onChange={setGran} size="sm" />
+            </div>
+            <div className="overflow-hidden rounded-xl border border-line">
+              <table className="w-full border-collapse text-left">
+                <thead className="bg-inset/40 text-[11px] text-faint">
+                  <tr className="border-b border-line">
+                    <th className="px-3 py-1.5 font-medium">Periodo</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Cumpl.</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Asist.</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Activas</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Viajes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {buckets.map((b) => (
+                    <tr key={b.bucketKey} className="border-b border-line last:border-0">
+                      <td className="whitespace-nowrap px-3 py-1.5 text-xs text-fg">{bucketLabel(b)}</td>
+                      <td className={clsx('px-3 py-1.5 text-right text-xs font-semibold tabular-nums', pctTone(b.avgCompliancePct))}>{b.avgCompliancePct}%</td>
+                      <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted">{b.attendancePct}%</td>
+                      <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted">{b.activeHours}h</td>
+                      <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted">{b.trips}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
             <h3 className="mb-2 text-xs font-semibold text-muted">Historial reciente</h3>
             <div className="overflow-hidden rounded-xl border border-line">
               <div className="max-h-72 divide-y divide-line overflow-y-auto">
@@ -138,12 +189,12 @@ export default function RiderDetailSheet({ rider, onClose }) {
                   const meta = STATUS_META[d.status]
                   return (
                     <div key={d.date} className="flex items-center gap-3 px-3 py-2">
-                      <span className="w-12 shrink-0 text-[11px] tabular-nums text-muted">{longDate(d.date).slice(0, 5)}</span>
+                      <span className="w-12 shrink-0 text-[11px] tabular-nums text-muted">{shortDate(d.date)}</span>
                       <div className="min-w-0 flex-1 truncate text-[11px] text-faint">
-                        plan {fmtMinutes(d.plannedMinutes)} · real {fmtMinutes(d.workedMinutes)}
-                        {d.checkInDelayMin > 0 ? ` · +${d.checkInDelayMin}m` : ''}
+                        {d.scheduled ? `plan ${Math.round((d.plannedMin || 0) / 6) / 10}h · ` : 'extra · '}
+                        {(d.activeHours || 0).toFixed(1)}h act · {d.trips || 0} viajes
                       </div>
-                      <span className="shrink-0 text-xs font-semibold tabular-nums text-fg">{d.compliancePct}%</span>
+                      {d.compliancePct != null && <span className="shrink-0 text-xs font-semibold tabular-nums text-fg">{d.compliancePct}%</span>}
                       <span className={clsx('inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium', meta?.chip)}>{meta?.label}</span>
                     </div>
                   )

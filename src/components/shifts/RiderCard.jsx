@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import clsx from 'clsx'
 import { ChevronDown, Plus } from 'lucide-react'
-import { PLATFORMS, STATES, DAY_INDEX } from './platforms'
+import { PLATFORMS, STATES, DAY_INDEX, DAYS } from './platforms'
 import ShiftRow from './ShiftRow'
 import StateEditor from './StateEditor'
 
@@ -14,6 +14,14 @@ export default function RiderCard({ rider, shifts, absences, showBadge, onAddShi
   const [open, setOpen] = useState(false)
   const plat = PLATFORMS[rider.provider] || PLATFORMS.uber
   const sorted = [...shifts].sort((a, b) => DAY_INDEX[a.dia] - DAY_INDEX[b.dia] || a.hora_inicio.localeCompare(b.hora_inicio))
+  // Agrupa por día: el día se muestra una vez y sus turnos se apilan debajo.
+  const byDay = new Map()
+  for (const s of sorted) {
+    if (!byDay.has(s.dia)) byDay.set(s.dia, [])
+    byDay.get(s.dia).push(s)
+  }
+  const usedDays = DAYS.filter((d) => byDay.has(d.id))
+  const firstFreeDay = (DAYS.find((d) => !byDay.has(d.id)) || DAYS[0]).id
 
   return (
     <div className={clsx('overflow-hidden rounded-2xl border border-line shadow-elev-1', showBadge ? clsx(plat.tint, 'border-l-4', plat.edge) : 'bg-panel')}>
@@ -42,16 +50,29 @@ export default function RiderCard({ rider, shifts, absences, showBadge, onAddShi
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-faint">Turnos</h4>
-              <button onClick={() => onAddShift(rider.name, rider.city, rider.provider)} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-accent/50 hover:text-fg">
+              <button onClick={() => onAddShift(rider.name, rider.city, rider.provider, { dia: firstFreeDay, turno: 'manana' })} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-line px-2.5 py-1 text-xs font-medium text-muted transition hover:border-accent/50 hover:text-fg">
                 <Plus className="h-3.5 w-3.5" /> Añadir turno
               </button>
             </div>
-            {sorted.length === 0 ? (
+            {usedDays.length === 0 ? (
               <p className="text-xs text-faint">Sin turnos planificados.</p>
             ) : (
-              <div className="space-y-1.5">
-                {sorted.map((s) => (
-                  <ShiftRow key={s.id} shift={s} onUpdate={onUpdateShift} onRemove={onRemoveShift} />
+              <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+                {usedDays.map((d) => (
+                  <div key={d.id} className="flex gap-3 p-2">
+                    <div className="w-20 shrink-0 pt-2 text-sm font-medium text-fg">{d.label}</div>
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      {byDay.get(d.id).map((s) => (
+                        <ShiftRow key={s.id} shift={s} hideDay onUpdate={onUpdateShift} onRemove={onRemoveShift} />
+                      ))}
+                      <button
+                        onClick={() => onAddShift(rider.name, rider.city, rider.provider, { dia: d.id, turno: 'tarde' })}
+                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-muted transition hover:bg-inset hover:text-fg"
+                      >
+                        <Plus className="h-3 w-3" /> turno
+                      </button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

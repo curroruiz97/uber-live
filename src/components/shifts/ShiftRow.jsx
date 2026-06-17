@@ -10,18 +10,21 @@ const TURNOS = [
   { id: 'tarde', label: 'Tarde' },
 ]
 
-// Una fila de turno editable inline (día, turno, hora inicio/fin, notas) + eliminar.
-// Al cambiar la hora de inicio se reasigna el turno (mañana < 14:00, tarde >=) salvo edición manual.
-export default function ShiftRow({ shift, onUpdate, onRemove }) {
+// Una fila de turno editable inline (turno, hora inicio/fin, notas) + eliminar.
+// El día se muestra/edita aquí salvo que hideDay sea true (cuando las filas van agrupadas
+// bajo un único día). Al cambiar la hora de inicio se reasigna el turno (mañana < 14:00).
+export default function ShiftRow({ shift, onUpdate, onRemove, hideDay = false }) {
   const [confirming, setConfirming] = useState(false)
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-app/40 p-2">
-      <select aria-label="Día" value={shift.dia} onChange={(e) => onUpdate(shift.id, { dia: e.target.value })} className={clsx(FIELD, 'w-28')}>
-        {DAYS.map((d) => (
-          <option key={d.id} value={d.id}>{d.label}</option>
-        ))}
-      </select>
+      {!hideDay && (
+        <select aria-label="Día" value={shift.dia} onChange={(e) => onUpdate(shift.id, { dia: e.target.value })} className={clsx(FIELD, 'w-28')}>
+          {DAYS.map((d) => (
+            <option key={d.id} value={d.id}>{d.label}</option>
+          ))}
+        </select>
+      )}
       <select aria-label="Turno" value={shift.turno} onChange={(e) => onUpdate(shift.id, { turno: e.target.value })} className={clsx(FIELD, 'w-24')}>
         {TURNOS.map((t) => (
           <option key={t.id} value={t.id}>{t.label}</option>

@@ -43,6 +43,21 @@ const round = (n, d = 0) => {
   return Math.round((Number(n) || 0) * f) / f
 }
 
+// Canonicaliza el nombre de ciudad para agrupar/mostrar: sin acentos, MAYÚSCULAS,
+// sin sufijo de país (", SPAIN"/", ESPAÑA") y espacios simples. Así "Zaragoza",
+// "ZARAGOZA" y "SALAMANCA, SPAIN" / "Salamanca" caen en un único grupo.
+export function canonCity(s) {
+  if (!s) return null
+  const x = String(s)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/,\s*(SPAIN|ESPANA)\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return x || null
+}
+
 // 'HH:MM' -> minutos desde medianoche.
 function hmToMin(hhmm) {
   const [h, m] = String(hhmm || '').split(':').map(Number)
@@ -213,30 +228,49 @@ export function computeDayCompliance(plannedMin, actual, cfg = DEFAULT_CFG, abse
 export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_CFG) {
   const planned = expandSchedule(shiftPlans, absences, from, to)
   const statByKey = new Map()
-  for (const s of stats || []) statByKey.set(`${s.rider_key}|${s.work_date}`, s)
+  const bounds = new Map() // riderKey -> { first, last } fechas observadas con actividad
+  for (const s of stats || []) {
+    if (!s.work_date) continue
+    statByKey.set(`${s.rider_key}|${s.work_date}`, s)
+    const b = bounds.get(s.rider_key)
+    if (!b) bounds.set(s.rider_key, { first: s.work_date, last: s.work_date })
+    else {
+      if (s.work_date < b.first) b.first = s.work_date
+      if (s.work_date > b.last) b.last = s.work_date
+    }
+  }
+  // Solo nos importan los riders de la flota (los que tienen turnos). La actividad de
+  // otros couriers de Glovo no vinculados a un horario no entra en el cumplimiento.
+  const scheduledKeys = new Set((shiftPlans || []).filter((s) => s.rider_key).map((s) => s.rider_key))
   const seen = new Set()
   const out = []
 
   for (const p of planned) {
+    // Solo medimos a un rider DENTRO de su ventana de actividad observada: sin ninguna
+    // jornada registrada (clave sin cruzar) o fuera de [primera, última] no inventamos
+    // ausencias — eso evita el "mar de 0%" antes de existir datos o de gente no cruzada.
+    const b = bounds.get(p.riderKey)
+    if (!b || p.date < b.first || p.date > b.last) continue
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
     const a = statByKey.get(key) || null
     const comp = computeDayCompliance(p.plannedMin, a, cfg, p.absenceTipo)
     out.push({
-      riderKey: p.riderKey, name: p.name, provider: p.provider, city: a?.city || p.city, date: p.date, ...comp,
+      riderKey: p.riderKey, name: p.name, provider: p.provider, city: canonCity(a?.city || p.city), date: p.date, ...comp,
     })
   }
 
-  // Días con actividad pero sin turno planificado -> extra (si supera el umbral).
+  // Días con actividad pero sin turno planificado -> extra (solo riders de la flota).
   for (const s of stats || []) {
     if (!s.work_date || s.work_date < from || s.work_date > to) continue
+    if (!scheduledKeys.has(s.rider_key)) continue
     const key = `${s.rider_key}|${s.work_date}`
     if (seen.has(key)) continue
     const comp = computeDayCompliance(0, s, cfg, null)
     if (comp.status === 'no_programado') continue
     out.push({
       riderKey: s.rider_key, name: s.driver_name || s.rider_key, provider: s.source_provider || 'glovo',
-      city: s.city || null, date: s.work_date, ...comp,
+      city: canonCity(s.city), date: s.work_date, ...comp,
     })
   }
   return out

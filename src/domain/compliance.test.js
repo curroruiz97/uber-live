@@ -5,6 +5,7 @@ import {
   expandAbsences,
   computeDayCompliance,
   buildDaily,
+  canonCity,
   DEFAULT_CFG,
 } from './compliance'
 
@@ -104,17 +105,46 @@ describe('expandAbsences', () => {
   })
 })
 
+describe('canonCity', () => {
+  it('unifica mayúsculas, acentos y sufijo de país', () => {
+    expect(canonCity('Zaragoza')).toBe('ZARAGOZA')
+    expect(canonCity('ZARAGOZA')).toBe('ZARAGOZA')
+    expect(canonCity('SALAMANCA, SPAIN')).toBe('SALAMANCA')
+    expect(canonCity('Salamanca')).toBe('SALAMANCA')
+  })
+})
+
 describe('buildDaily', () => {
-  const plans = [{ rider_key: 'a', rider_name: 'ANA', provider: 'uber', city: 'ZARAGOZA', dia: 'lunes', hora_inicio: '10:00', hora_fin: '14:00' }]
-  it('cruza turnos con actividad y añade extras', () => {
+  const plans = [
+    { rider_key: 'a', rider_name: 'ANA', provider: 'uber', city: 'Zaragoza', dia: 'lunes', hora_inicio: '10:00', hora_fin: '14:00' },
+    { rider_key: 'a', rider_name: 'ANA', provider: 'uber', city: 'Zaragoza', dia: 'martes', hora_inicio: '10:00', hora_fin: '14:00' },
+  ]
+  it('cruza turnos con actividad y normaliza la ciudad (sin duplicar)', () => {
+    const stats = [stat({ rider_key: 'a', work_date: '2026-06-01', city: 'ZARAGOZA', active_hours: 4 })] // lunes
+    const a = buildDaily(plans, [], stats, '2026-06-01', '2026-06-01', cfg).find((r) => r.date === '2026-06-01')
+    expect(a.status).toBe('cumple')
+    expect(a.city).toBe('ZARAGOZA')
+  })
+  it('no inventa ausencias fuera de la ventana de actividad del rider', () => {
+    // 'a' solo tiene actividad el 06-01; el martes 06-02 queda fuera de [06-01,06-01].
+    const stats = [stat({ rider_key: 'a', work_date: '2026-06-01', active_hours: 4 })]
+    const daily = buildDaily(plans, [], stats, '2026-06-01', '2026-06-02', cfg)
+    expect(daily.find((r) => r.date === '2026-06-02')).toBeUndefined()
+  })
+  it('marca ausente un día programado SIN actividad dentro de la ventana', () => {
     const stats = [
-      stat({ rider_key: 'a', work_date: '2026-06-01', active_hours: 4 }), // cumple
-      stat({ rider_key: 'b', work_date: '2026-06-01', driver_name: 'BETO', active_hours: 5 }), // extra (sin turno)
+      stat({ rider_key: 'a', work_date: '2026-06-01', active_hours: 4 }),
+      stat({ rider_key: 'a', work_date: '2026-06-08', active_hours: 4 }),
+    ]
+    const mar = buildDaily(plans, [], stats, '2026-06-01', '2026-06-08', cfg).find((r) => r.date === '2026-06-02')
+    expect(mar.status).toBe('ausente') // martes programado, en ventana [06-01,06-08], sin actividad
+  })
+  it('ignora la actividad de riders sin turno (no son de la flota)', () => {
+    const stats = [
+      stat({ rider_key: 'a', work_date: '2026-06-01', active_hours: 4 }),
+      stat({ rider_key: 'z', work_date: '2026-06-01', driver_name: 'AJENO', active_hours: 5 }),
     ]
     const daily = buildDaily(plans, [], stats, '2026-06-01', '2026-06-01', cfg)
-    const a = daily.find((r) => r.riderKey === 'a')
-    const b = daily.find((r) => r.riderKey === 'b')
-    expect(a.status).toBe('cumple')
-    expect(b.status).toBe('extra')
+    expect(daily.find((r) => r.riderKey === 'z')).toBeUndefined()
   })
 })

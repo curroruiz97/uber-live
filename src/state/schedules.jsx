@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase } from '../lib/supabase'
 import { useApp } from './AppContext'
 import { useOrg } from './OrgContext'
-import { buildDaily, deriveAlerts, DEFAULT_CFG } from '../domain/compliance'
+import { buildDaily, deriveAlerts, canonCity, DEFAULT_CFG } from '../domain/compliance'
 import { buildPayloadFromCsv, chunk } from '../utils/glovoDaily'
 import { suggestMatches, autoLinkPairs, normName } from '../utils/identityMatch'
 import { isoLocal } from '../utils/period'
@@ -141,7 +141,7 @@ export function SchedulesProvider({ children }) {
         return
       }
       setCfg({ ...DEFAULT_CFG, ...(st.data?.schedule_config || {}) })
-      setRoster((ro.data || []).map((r) => ({ riderKey: r.rider_key, name: r.name, phone: r.phone, provider: r.provider, vehicleType: r.vehicle_type, city: r.city || null, active: r.active })))
+      setRoster((ro.data || []).map((r) => ({ riderKey: r.rider_key, name: r.name, phone: r.phone, provider: r.provider, vehicleType: r.vehicle_type, city: canonCity(r.city), active: r.active })))
       setShiftPlans(sp.data || [])
       setAbsences(ab.data || [])
       setRawStats(stats.data || [])

@@ -3,6 +3,7 @@ import {
   Map as MapIcon,
   Users,
   ShieldCheck,
+  CalendarDays,
   Settings,
   ChevronsLeft,
   ChevronsRight,
@@ -18,6 +19,7 @@ import Logo from '../common/Logo'
 const NAV = [
   { id: 'dashboard', label: 'Mapas', icon: MapIcon },
   { id: 'cumplimiento', label: 'Cumplimiento', icon: ShieldCheck },
+  { id: 'horarios', label: 'Horarios', icon: CalendarDays },
   { id: 'riders', label: 'Riders', icon: Users },
   { id: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon },
   { id: 'mensatek', label: 'Mensatek', icon: MensatekIcon },

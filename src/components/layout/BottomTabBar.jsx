@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Map as MapIcon, Users, MessageCircle, Settings, ShieldCheck } from 'lucide-react'
+import { Map as MapIcon, Users, MessageCircle, Settings, ShieldCheck, CalendarDays } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import { useMensatek } from '../../state/mensatek'
@@ -11,7 +11,8 @@ const MESSAGING = ['whatsapp', 'mensatek']
 
 const TABS = [
   { id: 'dashboard', label: 'Mapas', icon: MapIcon },
-  { id: 'cumplimiento', label: 'Cumplimiento', icon: ShieldCheck },
+  { id: 'cumplimiento', label: 'Cumplim.', icon: ShieldCheck },
+  { id: 'horarios', label: 'Horarios', icon: CalendarDays },
   { id: 'riders', label: 'Riders', icon: Users },
   { id: 'mensajes', label: 'Mensajes', icon: MessageCircle, target: 'whatsapp' },
   { id: 'config', label: 'Ajustes', icon: Settings },
@@ -43,7 +44,7 @@ export default function BottomTabBar() {
 
   return (
     <nav className="app-tabbar fixed inset-x-0 bottom-0 z-30 border-t border-line bg-app/90 pb-safe backdrop-blur md:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-5">
+      <div className="mx-auto grid max-w-lg grid-cols-6">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const on = isActive(tab)
@@ -55,7 +56,7 @@ export default function BottomTabBar() {
               onClick={() => go(tab)}
               aria-current={on ? 'page' : undefined}
               className={clsx(
-                'tappable relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[10px] font-medium transition-colors duration-200',
+                'tappable relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 px-0.5 pt-2 text-[10px] font-medium transition-colors duration-200',
                 on ? 'text-accent' : 'text-faint',
               )}
             >

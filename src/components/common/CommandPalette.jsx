@@ -5,6 +5,7 @@ import {
   Map as MapIcon,
   Users,
   ShieldCheck,
+  CalendarDays,
   Settings,
   Sun,
   Moon,
@@ -40,6 +41,7 @@ export default function CommandPalette({ open, onClose }) {
     const actions = [
       { id: 'nav-dashboard', group: 'Navegación', label: 'Ir a Mapas', icon: MapIcon, run: () => setActiveNav('dashboard') },
       { id: 'nav-cumplimiento', group: 'Navegación', label: 'Ir a Cumplimiento', icon: ShieldCheck, run: () => setActiveNav('cumplimiento') },
+      { id: 'nav-horarios', group: 'Navegación', label: 'Ir a Horarios', icon: CalendarDays, run: () => setActiveNav('horarios') },
       { id: 'nav-riders', group: 'Navegación', label: 'Ir a Riders', icon: Users, run: () => setActiveNav('riders') },
       { id: 'nav-config', group: 'Navegación', label: 'Ir a Ajustes', icon: Settings, run: () => setActiveNav('config') },
       { id: 'theme-light', group: 'Tema', label: 'Tema: Claro', icon: Sun, run: () => setTheme('light') },

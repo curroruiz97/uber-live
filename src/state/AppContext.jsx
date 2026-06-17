@@ -47,11 +47,10 @@ export function AppProvider({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeNav, setActiveNav] = useState(() => {
     try {
-      // Compat con navegación previa: 'mapa' se fusionó en 'dashboard' (Mapas) y
-      // 'horarios' pasó a llamarse 'cumplimiento'.
+      // Compat: 'mapa' se fusionó en 'dashboard' (Mapas). 'horarios' es ahora una
+      // sección propia (planificador de turnos), distinta de 'cumplimiento'.
       const v = localStorage.getItem(NAV_KEY) || 'dashboard'
       if (v === 'mapa') return 'dashboard'
-      if (v === 'horarios') return 'cumplimiento'
       return v
     } catch {
       return 'dashboard'

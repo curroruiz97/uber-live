@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import clsx from 'clsx'
 import { Plus, Trash2, Check, X, CalendarOff } from 'lucide-react'
-import DatePicker from '../common/DatePicker'
+import Dropdown from '../common/Dropdown'
+import DateRangePicker, { rangeDays } from '../common/DateRangePicker'
 import { STATES, STATE_IDS, forecastDays, longDate } from './platforms'
 
 const FIELD = 'rounded-lg border border-line bg-inset px-2 py-1.5 text-sm text-fg outline-none transition focus:border-accent/60'
+const TYPE_OPTIONS = STATE_IDS.map((id) => ({ id, label: STATES[id].label }))
 
 function AbsenceRow({ absence, onUpdate, onRemove }) {
   const [confirming, setConfirming] = useState(false)
@@ -15,20 +17,19 @@ function AbsenceRow({ absence, onUpdate, onRemove }) {
   return (
     <div className={clsx('rounded-xl border border-line p-3', meta.chip.replace(/text-[^ ]+/g, ''))}>
       <div className="flex flex-wrap items-center gap-2">
-        <select aria-label="Tipo de estado" value={absence.tipo} onChange={(e) => onUpdate(absence.id, { tipo: e.target.value })} className={clsx(FIELD, 'w-48')}>
-          {STATE_IDS.map((id) => (
-            <option key={id} value={id}>{STATES[id].label}</option>
-          ))}
-        </select>
-        <DatePicker block value={absence.fecha_inicio || ''} onChange={(v) => onUpdate(absence.id, { fecha_inicio: v })} placeholder="Desde" className="w-36" />
-        <input
-          aria-label="Días"
-          type="number"
-          min="0"
-          value={absence.dias ?? ''}
-          onChange={(e) => onUpdate(absence.id, { dias: e.target.value === '' ? null : Math.max(0, Number(e.target.value)) })}
-          placeholder="días"
-          className={clsx(FIELD, 'w-20 tabular-nums')}
+        <Dropdown
+          ariaLabel="Tipo de estado"
+          value={absence.tipo}
+          onChange={(v) => onUpdate(absence.id, { tipo: v })}
+          options={TYPE_OPTIONS}
+          dotFor={(id) => STATES[id]?.dot}
+          className="w-52"
+        />
+        <DateRangePicker
+          from={absence.fecha_inicio || null}
+          to={absence.fecha_fin || null}
+          onChange={({ from, to }) => onUpdate(absence.id, { fecha_inicio: from, dias: from ? rangeDays(from, to) : null })}
+          className="w-56"
         />
         <input aria-label="Nota" type="text" value={absence.nota || ''} onChange={(e) => onUpdate(absence.id, { nota: e.target.value })} placeholder="Nota" className={clsx(FIELD, 'min-w-[6rem] flex-1')} />
 
@@ -54,7 +55,8 @@ function AbsenceRow({ absence, onUpdate, onRemove }) {
   )
 }
 
-// Editor de estados/causas de un rider con duración editable y previsión automática.
+// Editor de estados/causas de un rider: tipo (desplegable propio), rango de fechas
+// (estilo Booking, días automáticos) y previsión de días no trabajables.
 export default function StateEditor({ riderName, city, provider, absences, onAdd, onUpdate, onRemove }) {
   return (
     <div className="space-y-2">

@@ -127,15 +127,36 @@ export function SchedulesProvider({ children }) {
     if (!orgId) return
     setLoading(true)
     try {
+      // Supabase PostgREST limita a ~1000 filas por defecto (max_rows).
+      // Paginamos rider_daily_stats para traer TODAS las filas de la ventana.
+      async function fetchAllStats() {
+        const PAGE = 1000
+        let all = []
+        let from = 0
+        while (true) {
+          const { data, error } = await supabase
+            .from('rider_daily_stats')
+            .select('*')
+            .eq('org_id', orgId)
+            .gte('work_date', span.from)
+            .order('work_date', { ascending: true })
+            .range(from, from + PAGE - 1)
+          if (error) return { data: null, error }
+          all = all.concat(data || [])
+          if (!data || data.length < PAGE) break
+          from += PAGE
+        }
+        return { data: all, error: null }
+      }
+
       const [st, ro, sp, ab, stats, imp] = await Promise.all([
         supabase.from('org_settings').select('schedule_config').eq('org_id', orgId).maybeSingle(),
         supabase.from('rider_roster').select('*').eq('org_id', orgId),
         supabase.from('shift_plans').select('*').eq('org_id', orgId),
         supabase.from('rider_absences').select('*').eq('org_id', orgId),
-        supabase.from('rider_daily_stats').select('*').eq('org_id', orgId).gte('work_date', span.from).limit(50000),
+        fetchAllStats(),
         supabase.from('glovo_imports').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(30),
       ])
-      // Si las tablas nuevas aún no existen, cae a demo para no romper la UI.
       if (sp.error || stats.error) {
         loadDemo()
         return

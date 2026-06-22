@@ -22,9 +22,16 @@ import WhatsAppView from '../whatsapp/WhatsAppView'
 import MensatekView from '../mensatek/MensatekView'
 import ScheduleView from '../schedules/ScheduleView'
 import ShiftPlannerView from '../shifts/ShiftPlannerView'
+import JornadasView from '../jornadas/JornadasView'
 import SettingsLayout from '../settings/SettingsLayout'
 import TrialBanner from '../billing/TrialBanner'
 import { useNativeBackToDashboard } from '../../native/useNativeBack'
+import { useSessionTracker } from '../../state/useSessionTracker'
+
+function SessionTrackerBridge() {
+  useSessionTracker()
+  return null
+}
 
 function LoadingState() {
   return (
@@ -50,6 +57,8 @@ function Content({ activeNav }) {
   if (activeNav === 'config') return <SettingsLayout />
 
   if (activeNav === 'cumplimiento') return <ScheduleView />
+
+  if (activeNav === 'jornadas') return <JornadasView />
 
   if (activeNav === 'horarios') return <ShiftPlannerView />
 
@@ -137,6 +146,7 @@ export default function DashboardLayout() {
 
   return (
     <FleetContext.Provider value={fleet}>
+      <SessionTrackerBridge />
       <div className="min-h-screen bg-app">
         <Sidebar mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} />
         <div className={clsx('transition-all duration-200', app.sidebarCollapsed ? 'md:pl-16' : 'md:pl-60')}>

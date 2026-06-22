@@ -27,11 +27,11 @@ export default function Podium({ top = [] }) {
         const r = byRank.get(s.rank)
         if (!r) return null
         return (
-          <div key={s.rank} className={clsx('flex w-[5.5rem] flex-col items-center sm:w-28', s.order)}>
+          <div key={s.rank} className={clsx('flex w-24 flex-col items-center sm:w-32', s.order)}>
             <div className={clsx('mb-1.5 flex h-11 w-11 items-center justify-center rounded-full bg-panel text-sm font-bold text-fg ring-2', s.ring)}>
               {initials(r.name)}
             </div>
-            <p className="mb-0.5 w-full truncate text-center text-xs font-medium text-fg">{r.name}</p>
+            <p className="mb-0.5 w-full text-center text-[11px] font-medium leading-tight text-fg sm:text-xs">{r.name}</p>
             <p className={clsx('text-sm font-bold tabular-nums', pctTone(r.avgCompliancePct))}>{r.avgCompliancePct}%</p>
             <div className={clsx('mt-1.5 flex w-full justify-center rounded-t-lg bg-inset pt-1.5', s.bar)}>
               <span className={clsx('flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold', s.badge)}>{s.rank}</span>

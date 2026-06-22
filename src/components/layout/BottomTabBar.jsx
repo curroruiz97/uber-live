@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Map as MapIcon, Users, MessageCircle, Settings, ShieldCheck, CalendarDays } from 'lucide-react'
+import { Map as MapIcon, Users, MessageCircle, Settings, ShieldCheck, CalendarDays, Activity } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import { useMensatek } from '../../state/mensatek'
@@ -12,6 +12,7 @@ const MESSAGING = ['whatsapp', 'mensatek']
 const TABS = [
   { id: 'dashboard', label: 'Mapas', icon: MapIcon },
   { id: 'cumplimiento', label: 'Cumplim.', icon: ShieldCheck },
+  { id: 'jornadas', label: 'Jornadas', icon: Activity },
   { id: 'horarios', label: 'Horarios', icon: CalendarDays },
   { id: 'riders', label: 'Riders', icon: Users },
   { id: 'mensajes', label: 'Mensajes', icon: MessageCircle, target: 'whatsapp' },
@@ -44,7 +45,7 @@ export default function BottomTabBar() {
 
   return (
     <nav className="app-tabbar fixed inset-x-0 bottom-0 z-30 border-t border-line bg-app/90 pb-safe backdrop-blur md:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-6">
+      <div className="mx-auto grid max-w-lg grid-cols-7">
         {TABS.map((tab) => {
           const Icon = tab.icon
           const on = isActive(tab)

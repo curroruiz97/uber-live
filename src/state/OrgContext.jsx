@@ -29,6 +29,7 @@ export function OrgProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   const reload = useCallback(async () => {
+    if (!user?.id) return
     setLoading(true)
     // Acepta automáticamente invitaciones pendientes para el email del usuario.
     try {
@@ -39,6 +40,7 @@ export function OrgProvider({ children }) {
     const { data } = await supabase
       .from('org_members')
       .select('role, created_at, organizations(id, name, slug, is_platform_admin)')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: true })
     const list = (data || [])
       .filter((r) => r.organizations)
@@ -52,7 +54,7 @@ export function OrgProvider({ children }) {
     setOrgs(list)
     setCurrentOrgId((prev) => (list.some((o) => o.id === prev) ? prev : list[0]?.id || ''))
     setLoading(false)
-  }, [])
+  }, [user?.id])
 
   useEffect(() => {
     if (!user?.id) return

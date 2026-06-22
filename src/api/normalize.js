@@ -140,8 +140,12 @@ const REGION_CENTROIDS = {
   bilbao: { city: 'Bilbao', lat: 43.263, lng: -2.935 },
   salamanca: { city: 'Salamanca', lat: 40.9651, lng: -5.664 },
   zaragoza: { city: 'Zaragoza', lat: 41.6488, lng: -0.8891 },
-  canarias: { city: 'Canarias', lat: 28.1235, lng: -15.4363 },
-  norte: { city: 'Norte', lat: 43.3619, lng: -5.8494 },
+  pamplona: { city: 'Pamplona', lat: 42.8125, lng: -1.6458 },
+  navarra: { city: 'Pamplona', lat: 42.8125, lng: -1.6458 },
+  santander: { city: 'Santander', lat: 43.4623, lng: -3.8100 },
+  tenerife: { city: 'Tenerife', lat: 28.4636, lng: -16.2518 },
+  canarias: { city: 'Tenerife', lat: 28.4636, lng: -16.2518 },
+  norte: { city: 'Santander', lat: 43.4623, lng: -3.8100 },
 }
 
 function regionForOrg(orgName) {

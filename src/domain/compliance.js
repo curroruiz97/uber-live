@@ -481,3 +481,24 @@ export function deriveAlerts(rows, cfg = DEFAULT_CFG) {
   out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
   return out
 }
+
+// Riders que deberían estar en turno AHORA según shift_plans.
+// Devuelve [{ riderKey, name, city, inicio, fin }].
+export function getRidersOnShiftNow(shiftPlans, now = new Date()) {
+  const dia = DIAS[(now.getDay() + 6) % 7]
+  const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const out = []
+  const seen = new Set()
+  for (const s of shiftPlans || []) {
+    if (!s.rider_key || s.dia !== dia) continue
+    if (seen.has(s.rider_key)) continue
+    const start = s.hora_inicio || '00:00'
+    const end = s.hora_fin || '23:59'
+    const crosses = start > end
+    const inShift = crosses ? (hhmm >= start || hhmm <= end) : (hhmm >= start && hhmm <= end)
+    if (!inShift) continue
+    seen.add(s.rider_key)
+    out.push({ riderKey: s.rider_key, name: s.rider_name, city: s.city, inicio: start, fin: end })
+  }
+  return out
+}

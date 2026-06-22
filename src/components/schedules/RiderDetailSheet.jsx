@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { X, Phone, Bike, MapPin, CheckCircle2, Users as UsersIcon, Timer, Power, Package, Percent, Gauge, UserX } from 'lucide-react'
+import { X, Phone, Bike, MapPin, CheckCircle2, Users as UsersIcon, Timer, Power, Package, Percent, Gauge, UserX, Clock } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
-import { aggregateCompliance, rollupByGranularity } from '../../domain/compliance'
+import { aggregateCompliance, rollupByGranularity, diaOfIso } from '../../domain/compliance'
 import { pushBackHandler } from '../../native/backStack'
 import ComplianceHeatmap from './ComplianceHeatmap'
 import TrendChart from './TrendChart'
@@ -42,7 +42,7 @@ function bucketLabel(b) {
 
 // Ficha de rider: bottom-sheet en móvil, drawer lateral en escritorio.
 export default function RiderDetailSheet({ rider, onClose }) {
-  const { daily, cfg } = useSchedules()
+  const { daily, cfg, shiftPlans } = useSchedules()
   const open = !!rider
   const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
@@ -87,6 +87,16 @@ export default function RiderDetailSheet({ rider, onClose }) {
     [rows],
   )
   const buckets = useMemo(() => rollupByGranularity([...rows].reverse(), gran, cfg).reverse(), [rows, gran, cfg])
+
+  const shiftByDay = useMemo(() => {
+    if (!rider) return new Map()
+    const map = new Map()
+    for (const s of shiftPlans) {
+      if (s.rider_key !== rider.riderKey) continue
+      map.set(s.dia, { inicio: s.hora_inicio, fin: s.hora_fin })
+    }
+    return map
+  }, [shiftPlans, rider])
 
   if (!mounted || !rider) return null
 
@@ -184,18 +194,44 @@ export default function RiderDetailSheet({ rider, onClose }) {
           <div>
             <h3 className="mb-2 text-xs font-semibold text-muted">Historial reciente</h3>
             <div className="overflow-hidden rounded-xl border border-line">
-              <div className="max-h-72 divide-y divide-line overflow-y-auto">
+              <div className="max-h-96 divide-y divide-line overflow-y-auto">
                 {rows.slice(0, 40).map((d) => {
                   const meta = STATUS_META[d.status]
+                  const shift = shiftByDay.get(diaOfIso(d.date))
+                  const plannedH = Math.round((d.plannedMin || 0) / 6) / 10
+                  const actualH = d.activeHours || 0
+                  const barMax = Math.max(plannedH, actualH, 1)
+                  const barPlan = (plannedH / barMax) * 100
+                  const barAct = (actualH / barMax) * 100
+                  const barColor = d.compliancePct >= (cfg.min_compliance_pct ?? 100) ? '#10b981' : d.compliancePct >= 50 ? '#f59e0b' : '#ef4444'
                   return (
-                    <div key={d.date} className="flex items-center gap-3 px-3 py-2">
-                      <span className="w-12 shrink-0 text-[11px] tabular-nums text-muted">{shortDate(d.date)}</span>
-                      <div className="min-w-0 flex-1 truncate text-[11px] text-faint">
-                        {d.scheduled ? `plan ${Math.round((d.plannedMin || 0) / 6) / 10}h · ` : 'extra · '}
-                        {(d.activeHours || 0).toFixed(1)}h act · {d.trips || 0} viajes
+                    <div key={d.date} className="space-y-1 px-3 py-2">
+                      <div className="flex items-center gap-3">
+                        <span className="w-12 shrink-0 text-[11px] tabular-nums text-muted">{shortDate(d.date)}</span>
+                        {shift && d.scheduled ? (
+                          <span className="inline-flex shrink-0 items-center gap-1 text-[10px] text-faint">
+                            <Clock className="h-3 w-3" />{shift.inicio}–{shift.fin}
+                          </span>
+                        ) : d.scheduled ? (
+                          <span className="text-[10px] text-faint">plan {plannedH}h</span>
+                        ) : (
+                          <span className="text-[10px] text-faint">extra</span>
+                        )}
+                        <div className="min-w-0 flex-1 truncate text-[10px] text-faint">
+                          {actualH.toFixed(1)}h act · {d.trips || 0} viajes
+                        </div>
+                        {d.compliancePct != null && <span className="shrink-0 text-xs font-semibold tabular-nums text-fg">{d.compliancePct}%</span>}
+                        <span className={clsx('inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium', meta?.chip)}>{meta?.label}</span>
                       </div>
-                      {d.compliancePct != null && <span className="shrink-0 text-xs font-semibold tabular-nums text-fg">{d.compliancePct}%</span>}
-                      <span className={clsx('inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium', meta?.chip)}>{meta?.label}</span>
+                      {d.scheduled && plannedH > 0 && (
+                        <div className="ml-12 flex items-center gap-2">
+                          <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-inset">
+                            <div className="absolute inset-y-0 left-0 rounded-full bg-fg/10" style={{ width: `${barPlan}%` }} />
+                            <div className="absolute inset-y-0 left-0 rounded-full transition-all" style={{ width: `${barAct}%`, backgroundColor: barColor }} />
+                          </div>
+                          <span className="w-16 shrink-0 text-right text-[10px] tabular-nums text-faint">{actualH.toFixed(1)}/{plannedH}h</span>
+                        </div>
+                      )}
                     </div>
                   )
                 })}

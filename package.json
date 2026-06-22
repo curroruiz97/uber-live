@@ -16,6 +16,7 @@
     "cap:ios": "npm run build && cap sync ios && cap open ios",
     "cap:run:android": "npm run build && cap run android",
     "cap:run:ios": "npm run build && cap run ios",
+    "sync-daily": "node scripts/sync-daily.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -27,7 +28,6 @@
     "@capacitor/keyboard": "^6.0.4",
     "@capacitor/network": "^6.0.4",
     "@capacitor/preferences": "^6.0.4",
-    "@capacitor/push-notifications": "^6.0.5",
     "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.3",
     "@fontsource-variable/inter": "^5.2.8",

@@ -272,6 +272,17 @@ export function SchedulesProvider({ children }) {
     [cfg, demoMode, orgId],
   )
 
+  const dataRange = useMemo(() => {
+    if (!rawStats.length) return null
+    let first = rawStats[0].work_date
+    let last = rawStats[0].work_date
+    for (const r of rawStats) {
+      if (r.work_date < first) first = r.work_date
+      if (r.work_date > last) last = r.work_date
+    }
+    return { first, last }
+  }, [rawStats])
+
   const stats = useMemo(() => {
     const linkedRiders = new Set(shiftPlans.filter((s) => s.rider_key).map((s) => s.rider_key))
     return {
@@ -290,12 +301,12 @@ export function SchedulesProvider({ children }) {
       cfg, setCfg, saveCfg,
       roster, shiftPlans, absences, rawStats, imports,
       daily, alerts, unseenAlerts, suggestions, unlinkedNames,
-      stats, span,
+      stats, span, dataRange,
       loading, demoMode, isOwnerOrAdmin,
       importGlovoDaily, linkRiders, autoLink, linkOne,
       reload: demoMode ? loadDemo : loadReal,
     }),
-    [cfg, saveCfg, roster, shiftPlans, absences, rawStats, imports, daily, alerts, unseenAlerts, suggestions, unlinkedNames, stats, span, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, loadDemo, loadReal],
+    [cfg, saveCfg, roster, shiftPlans, absences, rawStats, imports, daily, alerts, unseenAlerts, suggestions, unlinkedNames, stats, span, dataRange, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, loadDemo, loadReal],
   )
 
   return <SchedulesContext.Provider value={value}>{children}</SchedulesContext.Provider>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { CheckCircle2, Users as UsersIcon, UserX, Timer, Power, Package, Percent, Gauge, TrendingUp, PieChart, Trophy, AlertTriangle, MapPin } from 'lucide-react'
+import { CheckCircle2, Users as UsersIcon, UserX, Timer, Power, Package, Percent, Gauge, TrendingUp, PieChart, Trophy, AlertTriangle, MapPin, Database } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { aggregateCompliance, buildRanking, statusBreakdown, trendByDate } from '../../domain/compliance'
 import { inRange } from '../../utils/period'
@@ -14,6 +14,7 @@ import SectionCard from './SectionCard'
 import RangeControls from './RangeControls'
 import { usePeriodRange, previousWindow } from './usePeriodRange'
 import { pctTone, pctHex } from './statusMeta'
+import LiveComplianceCard from './LiveComplianceCard'
 
 const PERIODS = [
   { id: 'day', label: 'Día' },
@@ -60,7 +61,7 @@ function WorstRow({ r }) {
 }
 
 export default function SummaryTab() {
-  const { daily, cfg, loading } = useSchedules()
+  const { daily, cfg, loading, dataRange } = useSchedules()
   const ctl = usePeriodRange('week')
   const [city, setCity] = useState('all')
 
@@ -102,7 +103,12 @@ export default function SummaryTab() {
       <div className="space-y-2">
         <RangeControls ctl={ctl} presets={PERIODS} />
         <Dropdown value={city} onChange={setCity} options={cityOptions} ariaLabel="Ciudad" className="w-full" />
-        <p className="text-right text-xs text-faint">{ctl.label}</p>
+        <div className="flex items-center justify-between text-xs text-faint">
+          {dataRange ? (
+            <span className="inline-flex items-center gap-1"><Database className="h-3 w-3" /> Datos hasta: {dataRange.last.split('-').reverse().join('/')}</span>
+          ) : <span />}
+          <span>{ctl.label}</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -116,8 +122,16 @@ export default function SummaryTab() {
         <KpiCard label="Ausencias" value={agg.absences} icon={UserX} accent="red" hint={`${agg.partials} parciales · ${agg.justifiedDays} justif.`} />
       </div>
 
+      <LiveComplianceCard />
+
       {rows.length === 0 ? (
-        <EmptyState icon={TrendingUp} title="Sin datos en este periodo" hint="Sube los CSV de actividad para cruzarlos con los turnos planificados." />
+        <EmptyState
+          icon={TrendingUp}
+          title="Sin datos en este periodo"
+          hint={dataRange
+            ? `Los datos cubren del ${dataRange.first.split('-').reverse().join('/')} al ${dataRange.last.split('-').reverse().join('/')}. Sube CSVs más recientes o usa Histórico.`
+            : 'Sube los CSV de actividad para cruzarlos con los turnos planificados.'}
+        />
       ) : (
         <>
           <SectionCard icon={TrendingUp} title="Tendencia de cumplimiento" subtitle={`media diaria · umbral ${cfg.min_compliance_pct}%`}>

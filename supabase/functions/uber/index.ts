@@ -32,13 +32,45 @@ const envCfg = {
 type EnvName = 'sandbox' | 'production'
 type Creds = { clientId: string; clientSecret: string; scope: string }
 const tokenCache = new Map<string, { token: string; expiresAt: number }>()
+const cooldownUntil = new Map<string, number>()
+const COOLDOWN_MS = 5 * 60_000
 
-async function mintToken(orgId: string, creds: Creds, envName: EnvName, scopeOverride?: string | null, force?: boolean) {
+async function mintToken(orgId: string, creds: Creds, envName: EnvName, scopeOverride?: string | null, force?: boolean, adminClient?: any) {
   const scope = scopeOverride != null ? scopeOverride : creds.scope
   const cacheKey = `${orgId}:${envName}:${scope}`
+
+  // Cooldown: si Uber devolvió 429, no reintentar durante 5 min
+  const cd = cooldownUntil.get(cacheKey)
+  if (cd && cd > Date.now() && !force) {
+    const err: any = new Error('OAuth rate limited — reintentando en unos minutos.')
+    err.status = 429
+    err.kind = 'rate_limit'
+    throw err
+  }
+
   if (!force) {
+    // L1: in-memory (same isolate)
     const cached = tokenCache.get(cacheKey)
     if (cached && cached.expiresAt > Date.now() + 60_000) return cached.token
+    // L2: DB (survives across isolates)
+    if (adminClient && orgId) {
+      const { data: row } = await adminClient.from('org_secrets').select('uber_token, uber_token_expires_at').eq('org_id', orgId).maybeSingle()
+      if (row?.uber_token && row?.uber_token_expires_at) {
+        const dbExpiry = new Date(row.uber_token_expires_at).getTime()
+        if (row.uber_token === 'RATE_LIMITED') {
+          if (dbExpiry > Date.now()) {
+            cooldownUntil.set(cacheKey, dbExpiry)
+            const err: any = new Error('OAuth rate limited — reintentando en unos minutos.')
+            err.status = 429
+            err.kind = 'rate_limit'
+            throw err
+          }
+        } else if (dbExpiry > Date.now() + 60_000) {
+          tokenCache.set(cacheKey, { token: row.uber_token, expiresAt: dbExpiry })
+          return row.uber_token
+        }
+      }
+    }
   }
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
@@ -53,13 +85,32 @@ async function mintToken(orgId: string, creds: Creds, envName: EnvName, scopeOve
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok || !data.access_token) {
+    if (res.status === 429) {
+      const cooldownEnd = Date.now() + COOLDOWN_MS
+      cooldownUntil.set(cacheKey, cooldownEnd)
+      if (adminClient && orgId) {
+        await adminClient.from('org_secrets').update({
+          uber_token: 'RATE_LIMITED',
+          uber_token_expires_at: new Date(cooldownEnd).toISOString(),
+        }).eq('org_id', orgId).then(() => {})
+      }
+    }
     const err: any = new Error(`OAuth ${res.status}: ${data.error_description || data.error || JSON.stringify(data)}`)
-    err.status = 401
-    err.kind = 'oauth'
+    err.status = res.status === 429 ? 429 : 401
+    err.kind = res.status === 429 ? 'rate_limit' : 'oauth'
     throw err
   }
+  cooldownUntil.delete(cacheKey)
   const ttlMs = data.expires_in ? data.expires_in * 1000 : 3_600_000
-  tokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + ttlMs })
+  const expiresAt = Date.now() + ttlMs
+  tokenCache.set(cacheKey, { token: data.access_token, expiresAt })
+  // Persist to DB
+  if (adminClient && orgId) {
+    await adminClient.from('org_secrets').update({
+      uber_token: data.access_token,
+      uber_token_expires_at: new Date(expiresAt).toISOString(),
+    }).eq('org_id', orgId).then(() => {})
+  }
   return data.access_token
 }
 
@@ -139,9 +190,9 @@ async function fetchAnalytics(base: string, token: string, orgId: string) {
   return map
 }
 
-async function ping(orgId: string, creds: Creds, envName: EnvName, pastedToken?: string, scopeOverride?: string | null) {
+async function ping(orgId: string, creds: Creds, envName: EnvName, pastedToken?: string, scopeOverride?: string | null, adminClient?: any) {
   const base = envCfg.base[envName] || envCfg.base.sandbox
-  const token = pastedToken || (await mintToken(orgId, creds, envName, scopeOverride))
+  const token = pastedToken || (await mintToken(orgId, creds, envName, scopeOverride, false, adminClient))
   const orgsRes = await rawCall(base, '/v1/vehicle-suppliers/orgs', 'GET', token)
   if (orgsRes.status !== 200) {
     const err: any = new Error(orgsRes.json?.message || `Uber orgs respondió ${orgsRes.status}`)
@@ -152,9 +203,9 @@ async function ping(orgId: string, creds: Creds, envName: EnvName, pastedToken?:
   return { ok: true, orgs: (orgsRes.json.organizations || []).length }
 }
 
-async function fetchFleet(orgId: string, creds: Creds, envName: EnvName, pastedToken?: string, scopeOverride?: string | null) {
+async function fetchFleet(orgId: string, creds: Creds, envName: EnvName, pastedToken?: string, scopeOverride?: string | null, adminClient?: any) {
   const base = envCfg.base[envName] || envCfg.base.sandbox
-  const token = pastedToken || (await mintToken(orgId, creds, envName, scopeOverride))
+  const token = pastedToken || (await mintToken(orgId, creds, envName, scopeOverride, false, adminClient))
 
   const orgsRes = await rawCall(base, '/v1/vehicle-suppliers/orgs', 'GET', token)
   if (orgsRes.status !== 200) {
@@ -293,9 +344,9 @@ Deno.serve(async (req) => {
       return json(503, { error: 'not_configured', message: 'Esta organización no tiene configuradas las credenciales de Uber.' })
     }
 
-    if (path === '/ping') return json(200, await ping(orgId, creds, envName, pastedToken, scopeOverride))
+    if (path === '/ping') return json(200, await ping(orgId, creds, envName, pastedToken, scopeOverride, adminClient))
     if (path === '/fleet') {
-      const fleet = await fetchFleet(orgId, creds, envName, pastedToken, scopeOverride)
+      const fleet = await fetchFleet(orgId, creds, envName, pastedToken, scopeOverride, adminClient)
       const { data: sub } = await adminClient.from('subscriptions').select('rider_limit').eq('org_id', orgId).maybeSingle()
       const riderLimit = sub?.rider_limit ?? null
       return json(200, { ...fleet, riderLimit, overLimit: riderLimit != null && (fleet.riders?.length || 0) > riderLimit })

@@ -1,3 +1,4 @@
+import React from 'react'
 import { Loader2 } from 'lucide-react'
 import { ThemeProvider } from './state/ThemeContext'
 import { ToastProvider } from './state/toast'
@@ -17,6 +18,25 @@ import ConnectScreen from './components/onboarding/ConnectScreen'
 import DashboardLayout from './components/layout/DashboardLayout'
 import NativeBridge from './native/NativeBridge'
 import AppLock from './components/common/AppLock'
+
+class ErrorBoundary extends React.Component {
+  state = { error: null }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-app px-6 text-center">
+          <p className="text-lg font-semibold text-fg">Algo salió mal</p>
+          <p className="text-sm text-muted">{this.state.error?.message || 'Error inesperado'}</p>
+          <button className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white" onClick={() => { this.setState({ error: null }); window.location.reload() }}>
+            Recargar
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function Root() {
   const { connected } = useApp()
@@ -91,15 +111,17 @@ function PlanGate({ children }) {
 export default function App() {
   return (
     <ThemeProvider>
-      <NativeBridge />
-      <ToastProvider>
-        <NetworkProvider>
-          <AuthProvider>
-            <AuthGate />
-          </AuthProvider>
-        </NetworkProvider>
-      </ToastProvider>
-      <AppLock />
+      <ErrorBoundary>
+        <NativeBridge />
+        <ToastProvider>
+          <NetworkProvider>
+            <AuthProvider>
+              <AuthGate />
+            </AuthProvider>
+          </NetworkProvider>
+        </ToastProvider>
+        <AppLock />
+      </ErrorBoundary>
     </ThemeProvider>
   )
 }

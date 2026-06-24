@@ -224,22 +224,12 @@ export function computeDayCompliance(plannedMin, actual, cfg = DEFAULT_CFG, abse
   return { status, scheduled, attended, plannedMin, workedMin, compliancePct, rawPct, absenceTipo: absenceTipo || null, ...m }
 }
 
-// Última fecha con datos "completos" (suficientes riders). Excluye importaciones parciales
-// (p.ej. CSV de madrugada con solo 13 riders) que generarían ausencias falsas masivas.
 export function getEffectiveLastDate(stats) {
-  const countByDate = new Map()
+  let latest = null
   for (const s of stats || []) {
-    if (!s.work_date) continue
-    countByDate.set(s.work_date, (countByDate.get(s.work_date) || 0) + 1)
+    if (s.work_date && (!latest || s.work_date > latest)) latest = s.work_date
   }
-  if (!countByDate.size) return null
-  const maxDayRiders = Math.max(...countByDate.values())
-  const threshold = Math.max(5, Math.floor(maxDayRiders * 0.3))
-  const complete = [...countByDate.entries()]
-    .filter(([, c]) => c >= threshold)
-    .map(([d]) => d)
-    .sort()
-  return complete.length ? complete[complete.length - 1] : null
+  return latest
 }
 
 // Produce el array `daily` cruzando turnos + ausencias + actividad real en [from,to].
@@ -259,20 +249,14 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
       if (s.work_date > b.last) b.last = s.work_date
     }
   }
-  const maxDayRiders = statsCountByDate.size ? Math.max(...statsCountByDate.values()) : 0
   const scheduledKeys = new Set((shiftPlans || []).filter((s) => s.rider_key).map((s) => s.rider_key))
-  const importThreshold = Math.min(scheduledKeys.size, Math.max(5, Math.floor(maxDayRiders * 0.3)))
-  const latestStatsDate = statsCountByDate.size ? [...statsCountByDate.keys()].sort().pop() : null
   const seen = new Set()
   const out = []
 
   for (const p of planned) {
     const b = bounds.get(p.riderKey)
     if (!b || p.date < b.first) continue
-
-    const dayCount = statsCountByDate.get(p.date) || 0
-    if (dayCount > 0 && dayCount < importThreshold && p.date !== latestStatsDate) continue
-    if (dayCount === 0 && p.date > b.last) continue
+    if (statsCountByDate.get(p.date) === undefined && p.date > b.last) continue
 
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
@@ -286,8 +270,6 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
   for (const s of stats || []) {
     if (!s.work_date || s.work_date < from || s.work_date > to) continue
     if (!scheduledKeys.has(s.rider_key)) continue
-    const dayCount = statsCountByDate.get(s.work_date) || 0
-    if (dayCount > 0 && dayCount < importThreshold && s.work_date !== latestStatsDate) continue
     const key = `${s.rider_key}|${s.work_date}`
     if (seen.has(key)) continue
     const comp = computeDayCompliance(0, s, cfg, null)
@@ -309,9 +291,7 @@ export function aggregateCompliance(rows) {
     onlineHours: 0, activeHours: 0, openHours: 0, trips: 0, accept: 0, reject: 0, cancel: 0,
     lateDeliveries: 0, totalKm: 0, plannedMin: 0, workedMin: 0,
   }
-  let noData = 0
   for (const r of rows || []) {
-    if (r.status === 'sin_datos') { noData += 1; continue }
     acc.onlineHours += r.onlineHours || 0
     acc.activeHours += r.activeHours || 0
     acc.openHours += r.openHours || 0
@@ -340,7 +320,6 @@ export function aggregateCompliance(rows) {
   return {
     days: (rows || []).length,
     programmedDays: progN,
-    noDataDays: noData,
     justifiedDays: justified,
     extraDays: extras,
     present,

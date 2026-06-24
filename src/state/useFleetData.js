@@ -372,22 +372,43 @@ export function useFleetData(connection, provider = 'uber') {
       }
     })()
 
+    let backoffMs = POLL_INTERVAL_MS
+    let consecutiveErrors = 0
+
     async function doPoll() {
       try {
         const snap = await source.poll()
         if (cancelled) return
         applySnapshot(snap, false)
         setError(null)
+        consecutiveErrors = 0
+        backoffMs = POLL_INTERVAL_MS
       } catch (e) {
         if (!cancelled) setError(e?.message ?? 'Error al actualizar.')
+        consecutiveErrors += 1
+        const base = Math.min(POLL_INTERVAL_MS * Math.pow(2, consecutiveErrors), 5 * 60_000)
+        backoffMs = base + Math.round(Math.random() * base * 0.3)
       } finally {
-        if (!cancelled) setSecondsUntilRefresh(POLL_INTERVAL_MS / 1000)
+        if (!cancelled) {
+          setSecondsUntilRefresh(Math.round(backoffMs / 1000))
+          clearTimeout(tickTimer.current)
+          tickTimer.current = setTimeout(() => {
+            if (!document.hidden) doPoll()
+          }, backoffMs)
+        }
       }
     }
 
-    tickTimer.current = setInterval(() => {
-      if (document.hidden) return // pausa el polling cuando la pestaña no está visible
-      doPoll()
+    let polling = false
+    const origDoPoll = doPoll
+    doPoll = async () => {
+      if (polling) return
+      polling = true
+      try { await origDoPoll() } finally { polling = false }
+    }
+
+    tickTimer.current = setTimeout(() => {
+      if (!document.hidden) doPoll()
     }, POLL_INTERVAL_MS)
 
     setSecondsUntilRefresh(POLL_INTERVAL_MS / 1000)
@@ -402,7 +423,7 @@ export function useFleetData(connection, provider = 'uber') {
 
     return () => {
       cancelled = true
-      clearInterval(tickTimer.current)
+      clearTimeout(tickTimer.current)
       clearInterval(countdownTimer.current)
       document.removeEventListener('visibilitychange', onVisible)
     }

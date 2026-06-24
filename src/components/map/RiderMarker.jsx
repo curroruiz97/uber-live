@@ -6,24 +6,25 @@ import { useWhatsApp } from '../../state/whatsapp'
 import { waLink, buildMessage } from '../../utils/whatsapp'
 import WhatsAppIcon from '../common/WhatsAppIcon'
 
-function buildIcon(status, active, selected) {
+function buildIcon(status, active, selected, missingShift) {
   const s = STATUS[status] ?? STATUS.offline
-  const cls = ['rider-marker', active ? 'is-active' : '', selected ? 'is-selected' : '']
+  const cls = ['rider-marker', active ? 'is-active' : '', selected ? 'is-selected' : '', missingShift ? 'is-missing-shift' : '']
     .filter(Boolean)
     .join(' ')
   return L.divIcon({
     className: 'rider-marker-wrap',
-    html: `<div class="${cls}" style="color:${s.hex}"><span class="ring"></span><span class="dot"></span></div>`,
+    html: `<div class="${cls}" style="color:${missingShift ? '#ef4444' : s.hex}"><span class="ring"></span><span class="dot"></span></div>`,
     iconSize: [22, 22],
     iconAnchor: [11, 11],
   })
 }
 
-export default function RiderMarker({ rider, selected, onSelect }) {
+export default function RiderMarker({ rider, selected, onSelect, shiftInfo }) {
   const { settings, logSent } = useWhatsApp()
   const s = STATUS[rider.status] ?? STATUS.offline
   const active = rider.status === 'en_ruta' || rider.status === 'en_entrega'
-  const icon = useMemo(() => buildIcon(rider.status, active, selected), [rider.status, active, selected])
+  const missingShift = !!shiftInfo && rider.status === 'offline'
+  const icon = useMemo(() => buildIcon(rider.status, active, selected, missingShift), [rider.status, active, selected, missingShift])
 
   if (!rider.location) return null
 
@@ -45,6 +46,16 @@ export default function RiderMarker({ rider, selected, onSelect }) {
           {rider.currentDelivery && (
             <p className="mt-1.5 text-xs text-muted">
               → {rider.currentDelivery.dropoffAddress || 'Viaje en curso'}
+            </p>
+          )}
+          {shiftInfo && rider.status === 'offline' && (
+            <p className="mt-1.5 rounded bg-red-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-red-600">
+              ⚠ Turno {shiftInfo.inicio}–{shiftInfo.fin} · No conectado
+            </p>
+          )}
+          {shiftInfo && rider.status !== 'offline' && (
+            <p className="mt-1.5 text-[11px] text-emerald-600">
+              ✓ En turno {shiftInfo.inicio}–{shiftInfo.fin}
             </p>
           )}
           {rider.zone && (

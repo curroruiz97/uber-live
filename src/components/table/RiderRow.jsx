@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Eye, Phone } from 'lucide-react'
+import { Eye, Phone, AlertCircle } from 'lucide-react'
 import StatusBadge from '../common/StatusBadge'
 import Avatar from '../common/Avatar'
 import WhatsAppIcon from '../common/WhatsAppIcon'
@@ -10,7 +10,7 @@ import { waLink, buildMessage } from '../../utils/whatsapp'
 import { formatRouteTime, formatRelative } from '../../utils/time'
 import { impactLight, selection } from '../../native/haptics'
 
-export default function RiderRow({ rider, now, selected, onSelect, index = 0 }) {
+export default function RiderRow({ rider, now, selected, onSelect, index = 0, shiftInfo }) {
   const { activeProvider } = useApp()
   const { settings, logSent, selectedIds, toggleSelect } = useWhatsApp()
   const checked = selectedIds.has(rider.id)
@@ -62,7 +62,19 @@ export default function RiderRow({ rider, now, selected, onSelect, index = 0 }) 
         <div className="flex items-center gap-2">
           <Avatar name={rider.name} size="sm" />
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium text-fg">{rider.name}</div>
+            <div className="flex items-center gap-1.5 truncate text-sm font-medium text-fg">
+              {rider.name}
+              {shiftInfo && rider.status === 'offline' && (
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400" title={`Turno ${shiftInfo.inicio}–${shiftInfo.fin}`}>
+                  <AlertCircle className="h-2.5 w-2.5" /> Turno
+                </span>
+              )}
+              {shiftInfo && rider.status !== 'offline' && (
+                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400" title={`Turno ${shiftInfo.inicio}–${shiftInfo.fin}`}>
+                  En turno
+                </span>
+              )}
+            </div>
             <div className="mt-0.5 flex items-center gap-2">
               <StatusBadge status={rider.status} size="sm" />
               <span className="text-[11px] text-faint">{rider.vehicleType}</span>

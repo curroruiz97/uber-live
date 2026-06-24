@@ -11,6 +11,9 @@ import {
 } from '../../config/constants'
 import { useApp, filterRiders } from '../../state/AppContext'
 import { useFleet } from '../../state/useFleetData'
+import { useSchedules } from '../../state/schedules'
+import { getRidersOnShiftNow } from '../../domain/compliance'
+import { digits } from '../../utils/glovoDaily'
 import { useTheme } from '../../state/ThemeContext'
 import { impactLight } from '../../native/haptics'
 import RiderMarker from './RiderMarker'
@@ -51,9 +54,9 @@ function InvalidateSize({ trigger }) {
   return null
 }
 
-function MapLegend() {
+function MapLegend({ fullscreen }) {
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-col gap-1 rounded-xl border border-line-strong bg-elevated/80 px-2.5 py-2 text-[11px] shadow-elev-2 backdrop-blur-xl">
+    <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-col gap-1 rounded-xl border border-line-strong bg-elevated/80 px-2.5 py-2 text-[11px] shadow-elev-2 backdrop-blur-xl" style={fullscreen ? { bottom: 'calc(var(--sab, env(safe-area-inset-bottom)) + 0.75rem)', left: 'calc(var(--sal, env(safe-area-inset-left)) + 0.75rem)' } : undefined}>
       {STATUS_ORDER.map((id) => {
         const s = STATUS[id]
         return (
@@ -70,9 +73,17 @@ function MapLegend() {
 export default function FleetMap({ height = 'h-[360px] md:h-[440px]' }) {
   const { filters, selectedRiderId, selectRider } = useApp()
   const { riders } = useFleet()
+  const { shiftPlans } = useSchedules()
   const { resolved } = useTheme()
   const [fullscreen, setFullscreen] = useState(false)
   const visible = useMemo(() => filterRiders(riders, filters), [riders, filters])
+
+  const shiftByPhone = useMemo(() => {
+    const onShift = getRidersOnShiftNow(shiftPlans, new Date())
+    const map = new Map()
+    for (const s of onShift) map.set(s.riderKey, s)
+    return map
+  }, [shiftPlans])
 
   useEffect(() => {
     if (!fullscreen) return undefined
@@ -121,13 +132,14 @@ export default function FleetMap({ height = 'h-[360px] md:h-[440px]' }) {
             rider={r}
             selected={r.id === selectedRiderId}
             onSelect={selectRider}
+            shiftInfo={r.phone ? shiftByPhone.get(digits(r.phone)) : null}
           />
         ))}
       </MapContainer>
 
-      <MapLegend />
+      <MapLegend fullscreen={fullscreen} />
 
-      <div className="pointer-events-none absolute right-3 top-3 z-[500] flex items-center gap-2">
+      <div className="pointer-events-none absolute right-3 top-3 z-[500] flex items-center gap-2" style={fullscreen ? { top: 'calc(var(--sat, env(safe-area-inset-top)) + 0.75rem)', right: 'calc(var(--sar, env(safe-area-inset-right)) + 0.75rem)' } : undefined}>
         <span className="rounded-full border border-line-strong bg-elevated/80 px-2.5 py-1 text-[11px] font-medium tabular-nums text-muted shadow-elev-2 backdrop-blur-xl">
           {visible.length} riders visibles
         </span>

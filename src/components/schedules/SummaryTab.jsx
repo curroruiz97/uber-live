@@ -17,7 +17,8 @@ import { pctTone, pctHex } from './statusMeta'
 import LiveComplianceCard from './LiveComplianceCard'
 
 const PERIODS = [
-  { id: 'day', label: 'Día' },
+  { id: 'day', label: 'Hoy' },
+  { id: 'yesterday', label: 'Ayer' },
   { id: 'week', label: 'Semana' },
   { id: 'month', label: 'Mes' },
   { id: 'all', label: 'Histórico' },

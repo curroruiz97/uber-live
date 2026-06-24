@@ -246,11 +246,11 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
   const out = []
 
   for (const p of planned) {
-    // Solo medimos a un rider DENTRO de su ventana de actividad observada: sin ninguna
-    // jornada registrada (clave sin cruzar) o fuera de [primera, última] no inventamos
-    // ausencias — eso evita el "mar de 0%" antes de existir datos o de gente no cruzada.
+    // Solo medimos a un rider A PARTIR de su primera jornada con actividad registrada:
+    // antes de ese punto no inventamos ausencias (evita "mar de 0%" para gente sin cruzar).
+    // Después del último dato SÍ mostramos: si no hay CSV importado, aparece como ausente.
     const b = bounds.get(p.riderKey)
-    if (!b || p.date < b.first || p.date > b.last) continue
+    if (!b || p.date < b.first) continue
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
     const a = statByKey.get(key) || null

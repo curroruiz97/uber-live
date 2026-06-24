@@ -4,6 +4,9 @@ import { ArrowUpDown, Users, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useApp, filterRiders } from '../../state/AppContext'
 import { useFleet } from '../../state/useFleetData'
 import { useWhatsApp } from '../../state/whatsapp'
+import { useSchedules } from '../../state/schedules'
+import { getRidersOnShiftNow } from '../../domain/compliance'
+import { digits } from '../../utils/glovoDaily'
 import { useNow } from '../../state/useNow'
 import { STATUS_ORDER } from '../../config/constants'
 import EmptyState from '../common/EmptyState'
@@ -16,7 +19,7 @@ const PAGE_SIZE = 10
 
 const COLUMNS = [
   { key: 'name', label: 'Rider', sortable: true, className: '' },
-  { key: 'status', label: 'Estado', sortable: true, className: '' },
+  { key: 'status', label: 'Estado', sortable: true, className: 'hidden sm:table-cell' },
   { key: 'order', label: 'Pedido actual', sortable: false, className: 'hidden sm:table-cell' },
   { key: 'route', label: 'Tiempo en ruta', sortable: true, className: 'hidden md:table-cell' },
   { key: 'location', label: 'Última ubicación', sortable: false, className: 'hidden lg:table-cell' },
@@ -27,7 +30,15 @@ export default function RidersTable() {
   const { filters, selectedRiderId, selectRider } = useApp()
   const { riders } = useFleet()
   const { selectedIds, selectMany, clearSelection } = useWhatsApp()
+  const { shiftPlans } = useSchedules()
   const now = useNow(1000)
+
+  const shiftByPhone = useMemo(() => {
+    const onShift = getRidersOnShiftNow(shiftPlans, now)
+    const map = new Map()
+    for (const s of onShift) map.set(s.riderKey, s)
+    return map
+  }, [shiftPlans, now])
   const [sort, setSort] = useState({ key: 'status', dir: 'asc' })
   const [page, setPage] = useState(0)
   const [bulkOpen, setBulkOpen] = useState(false)
@@ -154,6 +165,7 @@ export default function RidersTable() {
               index={i}
               selected={rider.id === selectedRiderId}
               onSelect={selectRider}
+              shiftInfo={rider.phone ? shiftByPhone.get(digits(rider.phone)) : null}
             />
           ))}
         </tbody>

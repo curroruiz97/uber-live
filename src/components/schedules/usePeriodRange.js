@@ -33,6 +33,10 @@ export function usePeriodRange(initial = 'week') {
 
   const range = useMemo(() => {
     if (period === 'all') return WIDE
+    if (period === 'yesterday') {
+      const y = addDaysIso(isoLocal(new Date()), -1)
+      return { from: y, to: y }
+    }
     if (period === 'custom') {
       const today = isoLocal(new Date())
       let f = customFrom || customTo || today
@@ -49,6 +53,7 @@ export function usePeriodRange(initial = 'week') {
 
   const label = useMemo(() => {
     if (period === 'all') return 'histórico'
+    if (period === 'yesterday') return `ayer · ${fmtEs(range.from)}`
     if (period === 'custom') return `${fmtEs(range.from)} – ${fmtEs(range.to)}`
     return periodLabel(period)
   }, [period, range])

@@ -260,25 +260,22 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
     }
   }
   const maxDayRiders = statsCountByDate.size ? Math.max(...statsCountByDate.values()) : 0
-  const importThreshold = Math.max(5, Math.floor(maxDayRiders * 0.3))
-
   const scheduledKeys = new Set((shiftPlans || []).filter((s) => s.rider_key).map((s) => s.rider_key))
+  const importThreshold = Math.min(scheduledKeys.size, Math.max(5, Math.floor(maxDayRiders * 0.3)))
   const seen = new Set()
   const out = []
 
   for (const p of planned) {
     const b = bounds.get(p.riderKey)
     if (!b || p.date < b.first) continue
+
+    const dayCount = statsCountByDate.get(p.date) || 0
+    if (dayCount > 0 && dayCount < importThreshold) continue
+    if (dayCount === 0 && p.date > b.last) continue
+
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
-
     const a = statByKey.get(key) || null
-    if (!a) {
-      const dayCount = statsCountByDate.get(p.date) || 0
-      if (dayCount === 0 && p.date > b.last) continue
-      if (dayCount > 0 && dayCount < importThreshold) continue
-    }
-
     const comp = computeDayCompliance(p.plannedMin, a, cfg, p.absenceTipo)
     out.push({
       riderKey: p.riderKey, name: p.name, provider: p.provider, city: canonCity(a?.city || p.city), date: p.date, ...comp,
@@ -288,6 +285,8 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
   for (const s of stats || []) {
     if (!s.work_date || s.work_date < from || s.work_date > to) continue
     if (!scheduledKeys.has(s.rider_key)) continue
+    const dayCount = statsCountByDate.get(s.work_date) || 0
+    if (dayCount > 0 && dayCount < importThreshold) continue
     const key = `${s.rider_key}|${s.work_date}`
     if (seen.has(key)) continue
     const comp = computeDayCompliance(0, s, cfg, null)

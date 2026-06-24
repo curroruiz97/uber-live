@@ -11,6 +11,11 @@ function StatusDot({ color }) {
   return <span className={clsx('inline-block h-2 w-2 shrink-0 rounded-full', color)} />
 }
 
+function phoneSuffix(s) {
+  const d = digits(s)
+  return d.length > 9 ? d.slice(-9) : d
+}
+
 export default function LiveComplianceCard() {
   const { shiftPlans, demoMode } = useSchedules()
   const { riders: fleetRiders } = useFleet()
@@ -26,7 +31,7 @@ export default function LiveComplianceCard() {
   const fleetByPhone = useMemo(() => {
     const map = new Map()
     for (const r of fleetRiders || []) {
-      if (r.phone) map.set(digits(r.phone), r)
+      if (r.phone) map.set(phoneSuffix(r.phone), r)
     }
     return map
   }, [fleetRiders])
@@ -38,7 +43,7 @@ export default function LiveComplianceCard() {
     const connected = []
     const missing = []
     for (const s of onShift) {
-      const fleetR = fleetByPhone.get(s.riderKey)
+      const fleetR = fleetByPhone.get(phoneSuffix(s.riderKey))
       if (fleetR && fleetR.status !== 'offline') {
         connected.push({ ...s, status: fleetR.status, fleetName: fleetR.name })
       } else {

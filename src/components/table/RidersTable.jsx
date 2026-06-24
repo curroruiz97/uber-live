@@ -30,11 +30,12 @@ export default function RidersTable() {
   const { filters, selectedRiderId, selectRider } = useApp()
   const { riders } = useFleet()
   const { selectedIds, selectMany, clearSelection } = useWhatsApp()
-  const { shiftPlans } = useSchedules()
+  const { shiftPlans = [] } = useSchedules() ?? {}
   const now = useNow(1000)
 
   const shiftByPhone = useMemo(() => {
-    const onShift = getRidersOnShiftNow(shiftPlans, now)
+    if (!shiftPlans?.length) return new Map()
+    const onShift = getRidersOnShiftNow(shiftPlans, new Date(now))
     const map = new Map()
     for (const s of onShift) map.set(s.riderKey, s)
     return map
@@ -165,7 +166,7 @@ export default function RidersTable() {
               index={i}
               selected={rider.id === selectedRiderId}
               onSelect={selectRider}
-              shiftInfo={rider.phone ? shiftByPhone.get(digits(rider.phone)) : null}
+              shiftInfo={rider.phone && shiftByPhone.size ? shiftByPhone.get(digits(String(rider.phone))) : null}
             />
           ))}
         </tbody>

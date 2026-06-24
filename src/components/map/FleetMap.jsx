@@ -73,12 +73,14 @@ function MapLegend({ fullscreen }) {
 export default function FleetMap({ height = 'h-[360px] md:h-[440px]' }) {
   const { filters, selectedRiderId, selectRider } = useApp()
   const { riders } = useFleet()
-  const { shiftPlans } = useSchedules()
+  const schedules = useSchedules()
+  const shiftPlans = schedules?.shiftPlans || []
   const { resolved } = useTheme()
   const [fullscreen, setFullscreen] = useState(false)
   const visible = useMemo(() => filterRiders(riders, filters), [riders, filters])
 
   const shiftByPhone = useMemo(() => {
+    if (!shiftPlans?.length) return new Map()
     const onShift = getRidersOnShiftNow(shiftPlans, new Date())
     const map = new Map()
     for (const s of onShift) map.set(s.riderKey, s)
@@ -132,7 +134,7 @@ export default function FleetMap({ height = 'h-[360px] md:h-[440px]' }) {
             rider={r}
             selected={r.id === selectedRiderId}
             onSelect={selectRider}
-            shiftInfo={r.phone ? shiftByPhone.get(digits(r.phone)) : null}
+            shiftInfo={r.phone && shiftByPhone.size ? shiftByPhone.get(digits(String(r.phone))) : null}
           />
         ))}
       </MapContainer>

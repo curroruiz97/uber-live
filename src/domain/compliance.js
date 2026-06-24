@@ -12,8 +12,9 @@ export const COMPLIANCE_STATUS = {
   ausente: { id: 'ausente', label: 'Ausente', tone: 'red' },
   justificado: { id: 'justificado', label: 'Justificado', tone: 'sky' },
   extra: { id: 'extra', label: 'Extra', tone: 'violet' },
+  sin_datos: { id: 'sin_datos', label: 'Sin datos', tone: 'zinc' },
 }
-export const STATUS_LIST = ['cumple', 'parcial', 'ausente', 'justificado', 'extra']
+export const STATUS_LIST = ['cumple', 'parcial', 'ausente', 'justificado', 'extra', 'sin_datos']
 
 export const ALERT_TYPE = {
   ausente: { id: 'ausente', label: 'Ausencia', severity: 'critical' },
@@ -223,12 +224,30 @@ export function computeDayCompliance(plannedMin, actual, cfg = DEFAULT_CFG, abse
   return { status, scheduled, attended, plannedMin, workedMin, compliancePct, rawPct, absenceTipo: absenceTipo || null, ...m }
 }
 
+// Última fecha con datos "completos" (suficientes riders). Excluye importaciones parciales
+// (p.ej. CSV de madrugada con solo 13 riders) que generarían ausencias falsas masivas.
+export function getEffectiveLastDate(stats) {
+  const countByDate = new Map()
+  for (const s of stats || []) {
+    if (!s.work_date) continue
+    countByDate.set(s.work_date, (countByDate.get(s.work_date) || 0) + 1)
+  }
+  if (!countByDate.size) return null
+  const maxDayRiders = Math.max(...countByDate.values())
+  const threshold = Math.max(5, Math.floor(maxDayRiders * 0.3))
+  const complete = [...countByDate.entries()]
+    .filter(([, c]) => c >= threshold)
+    .map(([d]) => d)
+    .sort()
+  return complete.length ? complete[complete.length - 1] : null
+}
+
 // Produce el array `daily` cruzando turnos + ausencias + actividad real en [from,to].
-// dataLastDate: última fecha con datos importados (ISO); no generar ausencias después.
+// dataLastDate: última fecha con datos fiables (ISO); posterior → 'sin_datos'.
 export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_CFG, dataLastDate = null) {
   const planned = expandSchedule(shiftPlans, absences, from, to)
   const statByKey = new Map()
-  const bounds = new Map() // riderKey -> { first, last } fechas observadas con actividad
+  const bounds = new Map()
   for (const s of stats || []) {
     if (!s.work_date) continue
     statByKey.set(`${s.rider_key}|${s.work_date}`, s)
@@ -239,23 +258,31 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
       if (s.work_date > b.last) b.last = s.work_date
     }
   }
-  // Solo nos importan los riders de la flota (los que tienen turnos). La actividad de
-  // otros couriers de Glovo no vinculados a un horario no entra en el cumplimiento.
   const scheduledKeys = new Set((shiftPlans || []).filter((s) => s.rider_key).map((s) => s.rider_key))
   const seen = new Set()
   const out = []
 
-  // Cota global: no evaluar días posteriores al último CSV importado.
-  const globalLast = dataLastDate || (bounds.size ? [...bounds.values()].reduce((m, b) => b.last > m ? b.last : m, '') : null)
+  const effectiveLast = dataLastDate || getEffectiveLastDate(stats)
 
   for (const p of planned) {
-    // Solo medimos a un rider A PARTIR de su primera jornada con actividad registrada.
-    // No medimos DESPUÉS del último dato global (serían ausencias falsas sin CSV).
     const b = bounds.get(p.riderKey)
     if (!b || p.date < b.first) continue
-    if (globalLast && p.date > globalLast) continue
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
+
+    if (effectiveLast && p.date > effectiveLast) {
+      out.push({
+        riderKey: p.riderKey, name: p.name, provider: p.provider,
+        city: canonCity(p.city), date: p.date,
+        status: 'sin_datos', scheduled: true, attended: false,
+        plannedMin: p.plannedMin, workedMin: 0,
+        compliancePct: null, rawPct: null,
+        absenceTipo: p.absenceTipo || null, ...metricsFrom(null),
+      })
+      continue
+    }
+    if (!effectiveLast && p.date > b.last) continue
+
     const a = statByKey.get(key) || null
     const comp = computeDayCompliance(p.plannedMin, a, cfg, p.absenceTipo)
     out.push({
@@ -263,12 +290,12 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
     })
   }
 
-  // Días con actividad pero sin turno planificado -> extra (solo riders de la flota).
   for (const s of stats || []) {
     if (!s.work_date || s.work_date < from || s.work_date > to) continue
     if (!scheduledKeys.has(s.rider_key)) continue
     const key = `${s.rider_key}|${s.work_date}`
     if (seen.has(key)) continue
+    if (effectiveLast && s.work_date > effectiveLast) continue
     const comp = computeDayCompliance(0, s, cfg, null)
     if (comp.status === 'no_programado') continue
     out.push({
@@ -288,7 +315,9 @@ export function aggregateCompliance(rows) {
     onlineHours: 0, activeHours: 0, openHours: 0, trips: 0, accept: 0, reject: 0, cancel: 0,
     lateDeliveries: 0, totalKm: 0, plannedMin: 0, workedMin: 0,
   }
+  let noData = 0
   for (const r of rows || []) {
+    if (r.status === 'sin_datos') { noData += 1; continue }
     acc.onlineHours += r.onlineHours || 0
     acc.activeHours += r.activeHours || 0
     acc.openHours += r.openHours || 0
@@ -317,6 +346,7 @@ export function aggregateCompliance(rows) {
   return {
     days: (rows || []).length,
     programmedDays: progN,
+    noDataDays: noData,
     justifiedDays: justified,
     extraDays: extras,
     present,

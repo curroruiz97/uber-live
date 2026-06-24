@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase } from '../lib/supabase'
 import { useApp } from './AppContext'
 import { useOrg } from './OrgContext'
-import { buildDaily, deriveAlerts, canonCity, DEFAULT_CFG } from '../domain/compliance'
+import { buildDaily, deriveAlerts, canonCity, DEFAULT_CFG, getEffectiveLastDate } from '../domain/compliance'
 import { buildPayloadFromCsv, chunk } from '../utils/glovoDaily'
 import { suggestMatches, autoLinkPairs, normName } from '../utils/identityMatch'
 import { isoLocal } from '../utils/period'
@@ -178,10 +178,22 @@ export function SchedulesProvider({ children }) {
     else loadReal()
   }, [demoMode, loadDemo, loadReal])
 
+  const dataRange = useMemo(() => {
+    if (!rawStats.length) return null
+    let first = rawStats[0].work_date
+    let last = rawStats[0].work_date
+    for (const r of rawStats) {
+      if (r.work_date < first) first = r.work_date
+      if (r.work_date > last) last = r.work_date
+    }
+    const effectiveLast = getEffectiveLastDate(rawStats) || last
+    return { first, last: effectiveLast }
+  }, [rawStats])
+
   // Cruce turnos × actividad (cálculo puro, memorizado).
   const daily = useMemo(
-    () => buildDaily(shiftPlans, absences, rawStats, span.from, span.to, cfg),
-    [shiftPlans, absences, rawStats, span.from, span.to, cfg],
+    () => buildDaily(shiftPlans, absences, rawStats, span.from, span.to, cfg, dataRange?.last),
+    [shiftPlans, absences, rawStats, span.from, span.to, cfg, dataRange],
   )
   const alerts = useMemo(() => deriveAlerts(daily, cfg), [daily, cfg])
 
@@ -292,17 +304,6 @@ export function SchedulesProvider({ children }) {
     },
     [cfg, demoMode, orgId],
   )
-
-  const dataRange = useMemo(() => {
-    if (!rawStats.length) return null
-    let first = rawStats[0].work_date
-    let last = rawStats[0].work_date
-    for (const r of rawStats) {
-      if (r.work_date < first) first = r.work_date
-      if (r.work_date > last) last = r.work_date
-    }
-    return { first, last }
-  }, [rawStats])
 
   const stats = useMemo(() => {
     const linkedRiders = new Set(shiftPlans.filter((s) => s.rider_key).map((s) => s.rider_key))

@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { CheckCircle2, Users as UsersIcon, UserX, Timer, Power, Package, Percent, Gauge, TrendingUp, PieChart, Trophy, AlertTriangle, MapPin, Database } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
+import { useFleet } from '../../state/useFleetData'
 import { aggregateCompliance, buildRanking, statusBreakdown, trendByDate } from '../../domain/compliance'
-import { inRange } from '../../utils/period'
+import { digits } from '../../utils/glovoDaily'
+import { inRange, isoLocal } from '../../utils/period'
 import KpiCard from '../kpis/KpiCard'
 import EmptyState from '../common/EmptyState'
 import Dropdown from '../common/Dropdown'
@@ -15,6 +17,11 @@ import RangeControls from './RangeControls'
 import { usePeriodRange, previousWindow } from './usePeriodRange'
 import { pctTone, pctHex } from './statusMeta'
 import LiveComplianceCard from './LiveComplianceCard'
+
+function phoneSuffix(s) {
+  const d = digits(s)
+  return d.length > 9 ? d.slice(-9) : d
+}
 
 const PERIODS = [
   { id: 'day', label: 'Hoy' },
@@ -63,8 +70,19 @@ function WorstRow({ r }) {
 
 export default function SummaryTab() {
   const { daily, cfg, loading, dataRange } = useSchedules()
+  const { riders: fleetRiders } = useFleet()
   const ctl = usePeriodRange('week')
   const [city, setCity] = useState('all')
+
+  const fleetByPhone = useMemo(() => {
+    const map = new Map()
+    for (const r of fleetRiders || []) {
+      if (r.phone) map.set(phoneSuffix(r.phone), r)
+    }
+    return map
+  }, [fleetRiders])
+
+  const todayStr = useMemo(() => isoLocal(new Date()), [])
 
   const cityOptions = useMemo(() => {
     const set = new Set(daily.map((d) => d.city).filter(Boolean))
@@ -73,7 +91,18 @@ export default function SummaryTab() {
 
   const { from, to } = ctl.range
   const inPeriod = useMemo(() => daily.filter((d) => inRange(d.date, from, to)), [daily, from, to])
-  const rows = useMemo(() => (city === 'all' ? inPeriod : inPeriod.filter((d) => d.city === city)), [inPeriod, city])
+
+  const liveRows = useMemo(() => {
+    if (!fleetByPhone.size) return inPeriod
+    return inPeriod.map((row) => {
+      if (row.date !== todayStr || row.status !== 'ausente') return row
+      const fleetR = fleetByPhone.get(phoneSuffix(row.riderKey))
+      if (!fleetR || fleetR.status === 'offline') return row
+      return { ...row, attended: true, status: 'parcial' }
+    })
+  }, [inPeriod, todayStr, fleetByPhone])
+
+  const rows = useMemo(() => (city === 'all' ? liveRows : liveRows.filter((d) => d.city === city)), [liveRows, city])
 
   const agg = useMemo(() => aggregateCompliance(rows), [rows])
   const breakdown = useMemo(() => statusBreakdown(rows), [rows])

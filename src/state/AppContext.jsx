@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { STATUS_ORDER } from '../config/constants'
+import { useOrg } from './OrgContext'
+import { supabase } from '../lib/supabase'
 
 const CONN_KEY = 'ul-connection'
 const NAV_KEY = 'ul-nav'
@@ -43,6 +45,23 @@ export function AppProvider({ children }) {
     }
     return { token: '', environment: 'sandbox', demoMode: false, connected: false }
   })
+
+  // Sync: leer uber_environment de org_integrations y actualizar la conexión activa.
+  const { currentOrgId } = useOrg()
+  useEffect(() => {
+    if (!currentOrgId || connection.demoMode || !connection.connected) return
+    supabase
+      .from('org_integrations')
+      .select('uber_environment')
+      .eq('org_id', currentOrgId)
+      .maybeSingle()
+      .then(({ data }) => {
+        const dbEnv = data?.uber_environment
+        if (dbEnv && dbEnv !== connection.environment) {
+          setConnection((c) => ({ ...c, environment: dbEnv }))
+        }
+      })
+  }, [currentOrgId])
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeNav, setActiveNav] = useState(() => {
@@ -117,6 +136,10 @@ export function AppProvider({ children }) {
     setConnection({ token, environment, demoMode: false, connected: true })
   }, [])
 
+  const updateEnvironment = useCallback((env) => {
+    setConnection((c) => (c.connected && !c.demoMode ? { ...c, environment: env } : c))
+  }, [])
+
   const disconnect = useCallback(() => {
     setConnection({ token: '', environment: 'sandbox', demoMode: false, connected: false })
     setFilters(DEFAULT_FILTERS)
@@ -147,6 +170,7 @@ export function AppProvider({ children }) {
       ...connection,
       connectDemo,
       connectReal,
+      updateEnvironment,
       disconnect,
       sidebarCollapsed,
       toggleSidebar,
@@ -167,6 +191,7 @@ export function AppProvider({ children }) {
       connection,
       connectDemo,
       connectReal,
+      updateEnvironment,
       disconnect,
       sidebarCollapsed,
       toggleSidebar,

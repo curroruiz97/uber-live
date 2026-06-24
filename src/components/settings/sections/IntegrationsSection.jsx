@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { Loader2, Save, CheckCircle2, XCircle, Plug, ShieldCheck, MessageSquareText, Copy, Cloud, Bike } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useOrg } from '../../../state/OrgContext'
+import { useApp } from '../../../state/AppContext'
 import { useToast } from '../../../state/toast'
 import { createUberClient } from '../../../api/uberClient'
 import { mensatekApi } from '../../../api/mensatekClient'
@@ -37,6 +38,7 @@ function VerifyResult({ result }) {
 
 export default function IntegrationsSection() {
   const { currentOrgId: orgId, isOwnerOrAdmin } = useOrg()
+  const { updateEnvironment } = useApp()
   const { toast } = useToast()
   const [integ, setInteg] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -99,8 +101,10 @@ export default function IntegrationsSection() {
       const res = await orgCredentials.saveUber({ client_id: uClientId.trim(), client_secret: uSecret.trim(), scope: uScope.trim(), environment: uEnv })
       setUSecret('')
       await load()
-      if (res?.configured) toast({ type: 'success', title: 'Credenciales de Uber guardadas' })
-      else toast({ type: 'warning', title: 'Faltan datos', message: 'Rellena Client ID y Client Secret.' })
+      if (res?.configured) {
+        toast({ type: 'success', title: 'Credenciales de Uber guardadas' })
+        updateEnvironment(uEnv)
+      } else toast({ type: 'warning', title: 'Faltan datos', message: 'Rellena Client ID y Client Secret.' })
     } catch (e) {
       toast({ type: 'error', title: 'No se pudo guardar', message: e.message })
     }

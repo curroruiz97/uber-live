@@ -224,8 +224,8 @@ export function computeDayCompliance(plannedMin, actual, cfg = DEFAULT_CFG, abse
 }
 
 // Produce el array `daily` cruzando turnos + ausencias + actividad real en [from,to].
-// shiftPlans, absences: tablas completas. stats: rider_daily_stats acotado al rango.
-export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_CFG) {
+// dataLastDate: última fecha con datos importados (ISO); no generar ausencias después.
+export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_CFG, dataLastDate = null) {
   const planned = expandSchedule(shiftPlans, absences, from, to)
   const statByKey = new Map()
   const bounds = new Map() // riderKey -> { first, last } fechas observadas con actividad
@@ -245,12 +245,15 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
   const seen = new Set()
   const out = []
 
+  // Cota global: no evaluar días posteriores al último CSV importado.
+  const globalLast = dataLastDate || (bounds.size ? [...bounds.values()].reduce((m, b) => b.last > m ? b.last : m, '') : null)
+
   for (const p of planned) {
-    // Solo medimos a un rider A PARTIR de su primera jornada con actividad registrada:
-    // antes de ese punto no inventamos ausencias (evita "mar de 0%" para gente sin cruzar).
-    // Después del último dato SÍ mostramos: si no hay CSV importado, aparece como ausente.
+    // Solo medimos a un rider A PARTIR de su primera jornada con actividad registrada.
+    // No medimos DESPUÉS del último dato global (serían ausencias falsas sin CSV).
     const b = bounds.get(p.riderKey)
     if (!b || p.date < b.first) continue
+    if (globalLast && p.date > globalLast) continue
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
     const a = statByKey.get(key) || null

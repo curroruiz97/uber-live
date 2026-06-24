@@ -243,14 +243,15 @@ export function getEffectiveLastDate(stats) {
 }
 
 // Produce el array `daily` cruzando turnos + ausencias + actividad real en [from,to].
-// dataLastDate: última fecha con datos fiables (ISO); posterior → 'sin_datos'.
-export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_CFG, dataLastDate = null) {
+export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_CFG) {
   const planned = expandSchedule(shiftPlans, absences, from, to)
   const statByKey = new Map()
   const bounds = new Map()
+  const statsCountByDate = new Map()
   for (const s of stats || []) {
     if (!s.work_date) continue
     statByKey.set(`${s.rider_key}|${s.work_date}`, s)
+    statsCountByDate.set(s.work_date, (statsCountByDate.get(s.work_date) || 0) + 1)
     const b = bounds.get(s.rider_key)
     if (!b) bounds.set(s.rider_key, { first: s.work_date, last: s.work_date })
     else {
@@ -258,11 +259,12 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
       if (s.work_date > b.last) b.last = s.work_date
     }
   }
+  const maxDayRiders = statsCountByDate.size ? Math.max(...statsCountByDate.values()) : 0
+  const importThreshold = Math.max(5, Math.floor(maxDayRiders * 0.3))
+
   const scheduledKeys = new Set((shiftPlans || []).filter((s) => s.rider_key).map((s) => s.rider_key))
   const seen = new Set()
   const out = []
-
-  const effectiveLast = dataLastDate || getEffectiveLastDate(stats)
 
   for (const p of planned) {
     const b = bounds.get(p.riderKey)
@@ -270,20 +272,13 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
 
-    if (effectiveLast && p.date > effectiveLast) {
-      out.push({
-        riderKey: p.riderKey, name: p.name, provider: p.provider,
-        city: canonCity(p.city), date: p.date,
-        status: 'sin_datos', scheduled: true, attended: false,
-        plannedMin: p.plannedMin, workedMin: 0,
-        compliancePct: null, rawPct: null,
-        absenceTipo: p.absenceTipo || null, ...metricsFrom(null),
-      })
-      continue
-    }
-    if (!effectiveLast && p.date > b.last) continue
-
     const a = statByKey.get(key) || null
+    if (!a) {
+      const dayCount = statsCountByDate.get(p.date) || 0
+      if (dayCount === 0 && p.date > b.last) continue
+      if (dayCount > 0 && dayCount < importThreshold) continue
+    }
+
     const comp = computeDayCompliance(p.plannedMin, a, cfg, p.absenceTipo)
     out.push({
       riderKey: p.riderKey, name: p.name, provider: p.provider, city: canonCity(a?.city || p.city), date: p.date, ...comp,
@@ -295,7 +290,6 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
     if (!scheduledKeys.has(s.rider_key)) continue
     const key = `${s.rider_key}|${s.work_date}`
     if (seen.has(key)) continue
-    if (effectiveLast && s.work_date > effectiveLast) continue
     const comp = computeDayCompliance(0, s, cfg, null)
     if (comp.status === 'no_programado') continue
     out.push({

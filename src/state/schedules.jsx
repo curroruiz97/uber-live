@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { supabase } from '../lib/supabase'
 import { useApp } from './AppContext'
 import { useOrg } from './OrgContext'
-import { buildDaily, deriveAlerts, canonCity, DEFAULT_CFG, getEffectiveLastDate } from '../domain/compliance'
+import { buildDaily, deriveAlerts, canonCity, DEFAULT_CFG } from '../domain/compliance'
 import { buildPayloadFromCsv, chunk } from '../utils/glovoDaily'
 import { suggestMatches, autoLinkPairs, normName } from '../utils/identityMatch'
 import { isoLocal } from '../utils/period'
@@ -186,14 +186,13 @@ export function SchedulesProvider({ children }) {
       if (r.work_date < first) first = r.work_date
       if (r.work_date > last) last = r.work_date
     }
-    const effectiveLast = getEffectiveLastDate(rawStats) || last
-    return { first, last: effectiveLast }
+    return { first, last }
   }, [rawStats])
 
   // Cruce turnos × actividad (cálculo puro, memorizado).
   const daily = useMemo(
-    () => buildDaily(shiftPlans, absences, rawStats, span.from, span.to, cfg, dataRange?.last),
-    [shiftPlans, absences, rawStats, span.from, span.to, cfg, dataRange],
+    () => buildDaily(shiftPlans, absences, rawStats, span.from, span.to, cfg),
+    [shiftPlans, absences, rawStats, span.from, span.to, cfg],
   )
   const alerts = useMemo(() => deriveAlerts(daily, cfg), [daily, cfg])
 

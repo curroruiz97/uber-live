@@ -31,7 +31,10 @@ export default function LiveComplianceCard() {
     return map
   }, [fleetRiders])
 
+  const hasFleet = fleetByPhone.size > 0
+
   const classified = useMemo(() => {
+    if (!hasFleet) return { connected: [], missing: [] }
     const connected = []
     const missing = []
     for (const s of onShift) {
@@ -43,7 +46,7 @@ export default function LiveComplianceCard() {
       }
     }
     return { connected, missing }
-  }, [onShift, fleetByPhone])
+  }, [onShift, fleetByPhone, hasFleet])
 
   if (demoMode || onShift.length === 0) return null
 
@@ -52,21 +55,43 @@ export default function LiveComplianceCard() {
   return (
     <SectionCard icon={Radio} title="En turno ahora" subtitle={hhmm}>
       <div className="space-y-3">
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-4 text-sm">
           <span className="inline-flex items-center gap-1.5 font-semibold text-fg">
             <Clock className="h-4 w-4 text-faint" /> {onShift.length} en turno
           </span>
-          <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-            <UserCheck className="h-4 w-4" /> {classified.connected.length} conectados
-          </span>
-          {classified.missing.length > 0 && (
-            <span className="inline-flex items-center gap-1.5 font-semibold text-red-600 dark:text-red-400">
-              <UserX className="h-4 w-4" /> {classified.missing.length} ausentes
-            </span>
+          {hasFleet && (
+            <>
+              <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <UserCheck className="h-4 w-4" /> {classified.connected.length} conectados
+              </span>
+              {classified.missing.length > 0 && (
+                <span className="inline-flex items-center gap-1.5 font-semibold text-red-600 dark:text-red-400">
+                  <UserX className="h-4 w-4" /> {classified.missing.length} ausentes
+                </span>
+              )}
+            </>
           )}
         </div>
 
-        {classified.missing.length > 0 && (
+        {!hasFleet && (
+          <>
+            <p className="text-xs text-muted">Sin datos de flota en vivo. Conecta Uber en producción desde Ajustes &gt; Integraciones para ver quién está conectado.</p>
+            <div className="overflow-hidden rounded-lg border border-line">
+              <div className="max-h-40 divide-y divide-line overflow-y-auto">
+                {onShift.map((r) => (
+                  <div key={r.riderKey} className="flex items-center gap-2 px-3 py-1.5">
+                    <StatusDot color="bg-zinc-400" />
+                    <span className="min-w-0 flex-1 truncate text-xs text-fg">{r.name}</span>
+                    <span className="shrink-0 text-[10px] text-faint">{r.inicio}–{r.fin}</span>
+                    {r.city && <span className="shrink-0 text-[10px] text-faint">{r.city}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {hasFleet && classified.missing.length > 0 && (
           <div>
             <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400">
               <AlertCircle className="h-3.5 w-3.5" /> Deberían estar conectados
@@ -86,7 +111,7 @@ export default function LiveComplianceCard() {
           </div>
         )}
 
-        {classified.connected.length > 0 && (
+        {hasFleet && classified.connected.length > 0 && (
           <div>
             <div className="mb-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Conectados en turno</div>
             <div className="overflow-hidden rounded-lg border border-line">

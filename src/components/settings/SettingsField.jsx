@@ -38,17 +38,17 @@ export default function SettingsField({
 
 export function SettingsCard({ icon: Icon, title, subtitle, children, right }) {
   return (
-    <section className="rounded-xl border border-line bg-panel p-5 shadow-soft">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+    <section className="rounded-xl border border-line bg-panel p-4 shadow-soft sm:p-5">
+      <div className="mb-3 flex items-start justify-between gap-3 sm:mb-4">
+        <div className="flex items-center gap-2">
           {Icon && (
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-              <Icon className="h-4 w-4" />
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent sm:h-8 sm:w-8">
+              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
           )}
           <div>
             <h3 className="text-sm font-semibold text-fg">{title}</h3>
-            {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
+            {subtitle && <p className="mt-0.5 text-[11px] text-muted sm:text-xs">{subtitle}</p>}
           </div>
         </div>
         {right}

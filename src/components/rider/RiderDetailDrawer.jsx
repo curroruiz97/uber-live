@@ -52,7 +52,7 @@ export default function RiderDetailDrawer() {
         >
           {rider && (
             <div className="flex h-full flex-col">
-              <div className="flex items-start justify-between border-b border-line p-4 pt-[max(1rem,env(safe-area-inset-top))]">
+              <div className="flex items-start justify-between border-b border-line p-4 pt-[max(1rem,var(--sat,env(safe-area-inset-top)))]">
                 <div className="flex items-center gap-3">
                   <Avatar name={rider.name} size="md" />
                   <div className="min-w-0">
@@ -75,7 +75,7 @@ export default function RiderDetailDrawer() {
                 <RiderDetailBody rider={rider} delivery={delivery} now={now} />
               </div>
 
-              <div className="border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div className="border-t border-line p-4 pb-[max(1rem,var(--sab,env(safe-area-inset-bottom)))]">
                 <RiderDetailActions rider={rider} />
               </div>
             </div>

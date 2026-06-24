@@ -1,49 +1,32 @@
+import { Capacitor } from '@capacitor/core'
 import { isNative } from './platform'
 
-// Bloqueo biométrico (Face ID / huella) al reabrir la app. Envuelve el plugin
-// @aparajita/capacitor-biometric-auth con carga perezosa y degradación limpia: en
-// web siempre devuelve "no disponible" y verify() resuelve a true (no bloquea).
+// Bloqueo biométrico (Face ID / huella / PIN) al reabrir la app.
+// Usa directamente el plugin nativo de Capacitor sin pasar por el proxy JS
+// de @aparajita/capacitor-biometric-auth (que falla con code-splitting de Vite).
 
-const PREF_KEY = 'ul-biometric-lock' // '1' = activado por el usuario
+const PREF_KEY = 'ul-biometric-lock'
 
-let _plugin = null
-async function plugin() {
+function getNativePlugin() {
   if (!isNative) return null
-  if (!_plugin) {
-    try {
-      const m = await import('@aparajita/capacitor-biometric-auth')
-      _plugin = m.BiometricAuth
-    } catch {
-      _plugin = null
-    }
-  }
-  return _plugin
-}
-
-// ¿El dispositivo tiene biometría utilizable (enrolada)?
-export async function isBiometricAvailable() {
-  const p = await plugin()
-  if (!p) return false
-  try {
-    const info = await p.checkBiometry()
-    return Boolean(info?.isAvailable)
-  } catch {
-    return false
-  }
+  if (!Capacitor.isPluginAvailable('BiometricAuthNative')) return null
+  return Capacitor.Plugins.BiometricAuthNative
 }
 
 // Lanza la verificación nativa. Devuelve true si el usuario se autenticó.
 export async function verifyBiometric(reason = 'Desbloquea Sapiens Telco Live') {
-  const p = await plugin()
-  if (!p) return true // sin plugin (web): no bloqueamos
+  const p = getNativePlugin()
+  if (!p) return true
   try {
-    await p.authenticate({
+    await p.internalAuthenticate({
       reason,
       cancelTitle: 'Cancelar',
       allowDeviceCredential: true,
       iosFallbackTitle: 'Usar código',
       androidTitle: 'Verifica tu identidad',
-      androidSubtitle: 'Sapiens Telco Live',
+      androidSubtitle: reason,
+      androidConfirmationRequired: false,
+      androidBiometryStrength: 0,
     })
     return true
   } catch {
@@ -51,7 +34,7 @@ export async function verifyBiometric(reason = 'Desbloquea Sapiens Telco Live') 
   }
 }
 
-// Preferencia persistida (usa @capacitor/preferences en nativo; localStorage en web).
+// Preferencia persistida.
 export async function isBiometricLockEnabled() {
   try {
     if (isNative) {

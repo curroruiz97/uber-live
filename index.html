@@ -13,11 +13,19 @@
           var t = localStorage.getItem('ul-theme') || 'dark'
           var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
           document.documentElement.classList.toggle('dark', dark)
-          // Pinta el fondo base antes de que cargue el CSS (cero flash blanco).
           document.documentElement.style.backgroundColor = dark ? '#0A0B0D' : '#F7F8FA'
         } catch (e) {
           document.documentElement.classList.add('dark')
           document.documentElement.style.backgroundColor = '#0A0B0D'
+        }
+        // Safe areas para Android: env(safe-area-inset-*) no funciona en WebView.
+        // Inyectamos CSS vars como fallback. Java los sobreescribirá con valores exactos.
+        if (/android/i.test(navigator.userAgent)) {
+          var r = document.documentElement.style
+          r.setProperty('--sat', '48px')
+          r.setProperty('--sab', '24px')
+          r.setProperty('--sal', '0px')
+          r.setProperty('--sar', '0px')
         }
       })()
     </script>

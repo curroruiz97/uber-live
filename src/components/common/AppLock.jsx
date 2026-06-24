@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Fingerprint, Lock, Loader2 } from 'lucide-react'
 import { isNative } from '../../native/platform'
 import { pushBackHandler } from '../../native/backStack'
@@ -11,9 +11,13 @@ import Logo from './Logo'
 export default function AppLock() {
   const [locked, setLocked] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  // Cooldown: el prompt biométrico (AuthActivity) dispara appStateChange al cerrarse.
+  // Sin cooldown, el listener re-bloquea inmediatamente → bucle infinito.
+  const unlockTimestamp = useRef(0)
 
-  // Lanza el bloqueo si la preferencia está activa.
   async function lockIfEnabled() {
+    // Ignorar eventos de reactivación dentro de 2s del último desbloqueo
+    if (Date.now() - unlockTimestamp.current < 2000) return
     if (await isBiometricLockEnabled()) setLocked(true)
   }
 
@@ -22,7 +26,10 @@ export default function AppLock() {
     setVerifying(true)
     const ok = await verifyBiometric('Desbloquea Sapiens Telco Live')
     setVerifying(false)
-    if (ok) setLocked(false)
+    if (ok) {
+      unlockTimestamp.current = Date.now()
+      setLocked(false)
+    }
   }
 
   // Bloqueo en arranque en frío.

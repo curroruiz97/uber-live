@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Palette, Save, Loader2, Wand2, RotateCcw, Trash2, UploadCloud, Eye, Image as ImageIcon } from 'lucide-react'
+import { Palette, Save, Loader2, Wand2, RotateCcw, Trash2, UploadCloud, Image as ImageIcon } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import { useOrg } from '../../../state/OrgContext'
 import { useBrand } from '../../../state/BrandContext'
@@ -166,42 +166,47 @@ export default function BrandingSection() {
 
   return (
     <div className="space-y-4">
-      <SettingsCard
-        icon={Palette}
-        title="Color de marca"
-        subtitle="Acento de toda la interfaz: botones, enlaces, indicadores"
-        right={
-          <div className="flex items-center gap-2">
-            <button onClick={resetAccent} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-2 text-xs font-medium text-muted transition hover:bg-inset hover:text-fg" title="Restablecer al color por defecto">
+      <section className="rounded-xl border border-line bg-panel shadow-soft">
+        <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+          {/* Línea 1: icono + título */}
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <Palette className="h-4.5 w-4.5" />
+            </span>
+            <h3 className="text-[15px] font-semibold text-fg">Color de marca</h3>
+          </div>
+          {/* Línea 2: descripción */}
+          <p className="text-xs text-muted">Acento aplicado a botones, enlaces e indicadores de la interfaz.</p>
+          {/* Línea 3: botones */}
+          <div className="flex gap-2">
+            <button onClick={resetAccent} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2.5 text-xs font-medium text-muted transition hover:bg-inset hover:text-fg" title="Restablecer al color por defecto">
               <RotateCcw className="h-3.5 w-3.5" /> Restablecer
             </button>
-            <button onClick={saveAccent} disabled={saving || !dirty} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
+            <button onClick={saveAccent} disabled={saving || !dirty} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
             </button>
           </div>
-        }
-      >
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[auto_auto_1fr]">
-          <div>
-            <p className="mb-2 text-xs font-medium text-muted">Acento · tema claro</p>
-            <ColorPicker value={light} onChange={pickLight} />
-          </div>
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <p className="text-xs font-medium text-muted">Acento · tema oscuro</p>
-              <button onClick={deriveDark} className="inline-flex items-center gap-1 text-[11px] text-muted transition hover:text-accent" title="Derivar del color claro">
-                <Wand2 className="h-3 w-3" /> derivar
-              </button>
-            </div>
-            <ColorPicker value={dark} onChange={pickDark} />
-          </div>
-          <div>
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted"><Eye className="h-3.5 w-3.5" /> Vista previa en vivo</p>
-            <BrandPreview light={light} dark={dark} />
-          </div>
         </div>
-        {dirty && <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">Cambios sin guardar — pulsa Guardar para aplicarlos a todo el equipo.</p>}
-      </SettingsCard>
+        {/* Contenido */}
+        <div className="border-t border-line px-4 py-4 sm:px-5 sm:py-5">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <p className="mb-2 text-xs font-medium text-muted">Acento · claro</p>
+              <ColorPicker value={light} onChange={pickLight} />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-1">
+                <p className="text-xs font-medium text-muted">Acento · oscuro</p>
+                <button onClick={deriveDark} className="inline-flex items-center gap-1 text-[10px] text-muted transition hover:text-accent" title="Derivar del color claro">
+                  <Wand2 className="h-3 w-3" />
+                </button>
+              </div>
+              <ColorPicker value={dark} onChange={pickDark} />
+            </div>
+          </div>
+          {dirty && <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">Cambios sin guardar — pulsa Guardar para aplicarlos a todo el equipo.</p>}
+        </div>
+      </section>
 
       <SettingsCard icon={ImageIcon} title="Logotipo" subtitle="Sube tu logo para tema claro y oscuro (PNG/SVG transparente, máx 2 MB)">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -218,9 +223,7 @@ export default function BrandingSection() {
       </SettingsCard>
 
       <SettingsCard icon={ImageIcon} title="Favicon" subtitle="El icono de la pestaña del navegador (cuadrado, máx 512 KB)">
-        <div className="w-32">
-          <ImageDrop url={brand.faviconUrl} uploading={uploading === 'favicon'} disabled={Boolean(uploading)} bg="bg-inset" hint="Sube .png/.ico" height="h-20" onFile={(f) => uploadImage('favicon', f)} onRemove={() => removeImage('favicon')} />
-        </div>
+        <ImageDrop url={brand.faviconUrl} uploading={uploading === 'favicon'} disabled={Boolean(uploading)} bg="bg-inset" hint="Sube .png/.ico" height="h-20" onFile={(f) => uploadImage('favicon', f)} onRemove={() => removeImage('favicon')} />
       </SettingsCard>
     </div>
   )

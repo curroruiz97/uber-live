@@ -17,7 +17,7 @@ export default function AuthShell({ children, subtitle = 'Centro de control de f
         className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.08]"
         style={{ backgroundImage: 'radial-gradient(rgb(var(--c-fg)) 1px, transparent 1px)', backgroundSize: '24px 24px' }}
       />
-      <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10">
+      <div className="absolute right-4 top-[max(1rem,var(--sat,env(safe-area-inset-top)))] z-10">
         <ThemeToggle />
       </div>
 

@@ -3,10 +3,16 @@
   "appName": "Sapiens Telco Live",
   "webDir": "dist",
   "backgroundColor": "#0A0B0D",
+  "android": {
+    "backgroundColor": "#0A0B0D",
+    "allowMixedContent": true,
+    "webContentsDebuggingEnabled": true
+  },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 600,
-      "launchAutoHide": false,
+      "launchShowDuration": 400,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 250,
       "backgroundColor": "#0A0B0D",
       "showSpinner": false,
       "androidScaleType": "CENTER_CROP",
@@ -17,11 +23,7 @@
       "resizeOnFullScreen": true
     },
     "StatusBar": {
-      "overlaysWebView": false,
       "style": "DARK"
-    },
-    "PushNotifications": {
-      "presentationOptions": ["badge", "sound", "alert"]
     }
   }
 }

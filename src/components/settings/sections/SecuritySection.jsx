@@ -5,7 +5,6 @@ import { SettingsCard } from '../SettingsField'
 import { useToast } from '../../../state/toast'
 import { isNative } from '../../../native/platform'
 import {
-  isBiometricAvailable,
   isBiometricLockEnabled,
   setBiometricLockEnabled,
   verifyBiometric,
@@ -27,25 +26,18 @@ function Toggle({ on, onClick, disabled }) {
   )
 }
 
-// Seguridad del dispositivo: bloqueo biométrico (Face ID / huella). Es una preferencia
-// local del dispositivo (no de la org), porque protege esta instalación concreta.
 export default function SecuritySection() {
   const { toast } = useToast()
-  const [available, setAvailable] = useState(false)
   const [enabled, setEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
+    if (!isNative) return
     let alive = true
-    ;(async () => {
-      const [avail, en] = await Promise.all([isBiometricAvailable(), isBiometricLockEnabled()])
-      if (!alive) return
-      setAvailable(avail)
-      setEnabled(en)
-    })()
-    return () => {
-      alive = false
-    }
+    isBiometricLockEnabled().then((en) => {
+      if (alive) setEnabled(en)
+    })
+    return () => { alive = false }
   }, [])
 
   async function toggle() {
@@ -53,20 +45,21 @@ export default function SecuritySection() {
     setBusy(true)
     try {
       if (!enabled) {
-        // Verifica una vez antes de activar, para confirmar que funciona.
-        const ok = await verifyBiometric('Confirma para activar el bloqueo biométrico')
+        const ok = await verifyBiometric('Confirma para activar el bloqueo')
         if (!ok) {
-          toast({ type: 'warning', title: 'No se activó', message: 'No se pudo verificar la biometría.' })
+          toast({ type: 'warning', title: 'No se activó', message: 'Configura huella, Face ID o PIN en tu dispositivo.' })
           return
         }
         await setBiometricLockEnabled(true)
         setEnabled(true)
-        toast({ type: 'success', title: 'Bloqueo activado', message: 'Se pedirá Face ID o huella al abrir la app.' })
+        toast({ type: 'success', title: 'Bloqueo activado', message: 'Se pedirá huella o PIN al abrir la app.' })
       } else {
         await setBiometricLockEnabled(false)
         setEnabled(false)
         toast({ type: 'success', title: 'Bloqueo desactivado' })
       }
+    } catch {
+      toast({ type: 'error', title: 'Error', message: 'No se pudo cambiar el bloqueo.' })
     } finally {
       setBusy(false)
     }
@@ -87,12 +80,10 @@ export default function SecuritySection() {
           <div className="min-w-0">
             <p className="text-sm font-medium text-fg">Bloqueo biométrico</p>
             <p className="text-xs text-muted">
-              {available
-                ? 'Pide Face ID o huella al abrir la app y al volver desde segundo plano.'
-                : 'Configura Face ID o una huella en tu dispositivo para poder activarlo.'}
+              Pide huella, Face ID o PIN al abrir la app y al volver desde segundo plano.
             </p>
           </div>
-          <Toggle on={enabled} onClick={toggle} disabled={!available || busy} />
+          <Toggle on={enabled} onClick={toggle} disabled={busy} />
         </div>
       )}
     </SettingsCard>

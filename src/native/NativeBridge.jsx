@@ -10,10 +10,19 @@ export default function NativeBridge() {
 
   useEffect(() => {
     if (!isNative) return undefined
+
     let cleanup = () => {}
+
+    // Siempre intentar ocultar el splash al montar, como red de seguridad.
+    // Si launchAutoHide ya lo ocultó, esto es un no-op.
+    import('@capacitor/splash-screen')
+      .then(({ SplashScreen }) => SplashScreen.hide({ fadeOutDuration: 200 }))
+      .catch(() => {})
+
     initNativeShell().then((c) => {
       cleanup = c
     })
+
     return () => cleanup()
   }, [])
 

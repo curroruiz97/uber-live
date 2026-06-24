@@ -1,20 +1,13 @@
 import { useRef } from 'react'
 import { tripletToHsv, hsvToTriplet, tripletToHex, hexToTriplet, clamp } from '../../utils/color'
 
-// Paleta curada de acentos profesionales (tripletes "R G B").
-const PRESETS = [
-  '249 115 22', '234 88 12', '239 68 68', '236 72 153', '217 70 239', '168 85 247', '99 102 241',
-  '59 130 246', '14 165 233', '6 182 212', '20 184 166', '16 185 129', '132 204 22', '245 158 11',
-]
-
-// Selector de color propio (sin el diálogo nativo del SO): área saturación/brillo,
-// slider de matiz, hex y presets. value/onChange usan el triplete "R G B".
+// Selector de color: área saturación/brillo, slider de matiz, hex y muestra.
+// value/onChange usan el triplete "R G B".
 export default function ColorPicker({ value, onChange }) {
   const { h, s, v } = tripletToHsv(value)
   const svRef = useRef(null)
   const hueRef = useRef(null)
 
-  // Arrastre con captura global (suave dentro y fuera del recuadro).
   function startDrag(ref, apply) {
     return (e) => {
       e.preventDefault()
@@ -43,12 +36,12 @@ export default function ColorPicker({ value, onChange }) {
   })
 
   return (
-    <div className="w-full max-w-[15rem] select-none">
+    <div className="w-full select-none">
       {/* Área saturación (x) / brillo (y) */}
       <div
         ref={svRef}
         onPointerDown={onSV}
-        className="relative h-36 w-full cursor-crosshair touch-none rounded-lg ring-1 ring-line"
+        className="relative h-32 w-full cursor-crosshair touch-none rounded-lg ring-1 ring-line"
         style={{
           backgroundColor: `hsl(${h} 100% 50%)`,
           backgroundImage: 'linear-gradient(to top, #000, rgba(0,0,0,0)), linear-gradient(to right, #fff, rgba(255,255,255,0))',
@@ -64,7 +57,7 @@ export default function ColorPicker({ value, onChange }) {
       <div
         ref={hueRef}
         onPointerDown={onHue}
-        className="relative mt-3 h-3.5 w-full cursor-pointer touch-none rounded-full ring-1 ring-line"
+        className="relative mt-2.5 h-3 w-full cursor-pointer touch-none rounded-full ring-1 ring-line"
         style={{ backgroundImage: 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }}
       >
         <div
@@ -74,8 +67,8 @@ export default function ColorPicker({ value, onChange }) {
       </div>
 
       {/* Hex + muestra */}
-      <div className="mt-3 flex items-center gap-2">
-        <span className="h-9 w-9 shrink-0 rounded-lg ring-1 ring-line" style={{ backgroundColor: `rgb(${value})` }} />
+      <div className="mt-2.5 flex items-center gap-2">
+        <span className="h-8 w-8 shrink-0 rounded-lg ring-1 ring-line" style={{ backgroundColor: `rgb(${value})` }} />
         <div className="relative flex-1">
           <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-faint">#</span>
           <input
@@ -88,20 +81,6 @@ export default function ColorPicker({ value, onChange }) {
             className="w-full rounded-lg border border-line bg-inset py-2 pl-6 pr-2.5 font-mono text-sm uppercase text-fg outline-none focus:border-accent/60"
           />
         </div>
-      </div>
-
-      {/* Presets */}
-      <div className="mt-3 grid grid-cols-7 gap-1.5">
-        {PRESETS.map((p) => (
-          <button
-            key={p}
-            type="button"
-            onClick={() => onChange(p)}
-            className="h-6 w-full rounded-md ring-1 ring-black/10 transition hover:scale-110"
-            style={{ backgroundColor: `rgb(${p})` }}
-            title={tripletToHex(p)}
-          />
-        ))}
       </div>
     </div>
   )

@@ -6,7 +6,7 @@ import { useAuth } from '../../../state/AuthContext'
 import { useOrg } from '../../../state/OrgContext'
 import { useToast } from '../../../state/toast'
 import { ThemeSegmented } from '../../common/ThemeToggle'
-import SettingsField, { SettingsCard } from '../SettingsField'
+import SettingsField from '../SettingsField'
 import Avatar from '../Avatar'
 
 const ROLE_LABEL = { owner: 'Propietario', admin: 'Administrador', member: 'Miembro' }
@@ -73,51 +73,95 @@ export default function AccountCompanySection() {
   return (
     <div className="space-y-4">
       {/* Perfil */}
-      <SettingsCard icon={User} title="Tu perfil" subtitle="Cómo apareces ante tu equipo">
-        <div className="flex items-center gap-4">
-          <Avatar name={fullName} email={user?.email} size="h-14 w-14" className="!text-base" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-fg">{fullName || user?.email}</p>
-            <p className="truncate text-xs text-muted">{user?.email}</p>
-            <span className="mt-1 inline-block rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">{ROLE_LABEL[role] || role}</span>
+      <section className="rounded-xl border border-line bg-panel shadow-soft">
+        <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <User className="h-4.5 w-4.5" />
+            </span>
+            <h3 className="text-[15px] font-semibold text-fg">Tu perfil</h3>
           </div>
+          <p className="text-xs text-muted">Cómo apareces ante tu equipo.</p>
         </div>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <SettingsField label="Nombre completo" value={fullName} onChange={setFullName} placeholder="Tu nombre" />
+        <div className="border-t border-line px-4 py-4 sm:px-5 sm:py-5">
+          <div className="flex items-center gap-4">
+            <Avatar name={fullName} email={user?.email} size="h-14 w-14" className="!text-base" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-fg">{fullName || user?.email}</p>
+              <p className="truncate text-xs text-muted">{user?.email}</p>
+              <span className="mt-1 inline-block rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent">{ROLE_LABEL[role] || role}</span>
+            </div>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <SettingsField label="Nombre completo" value={fullName} onChange={setFullName} placeholder="Tu nombre" />
+          </div>
+          <button onClick={saveProfile} disabled={savingProfile} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
+            {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar perfil
+          </button>
         </div>
-        <button onClick={saveProfile} disabled={savingProfile} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
-          {savingProfile ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar perfil
-        </button>
-      </SettingsCard>
+      </section>
 
       {/* Empresa */}
-      <SettingsCard icon={Building2} title="Empresa" subtitle="Datos de tu organización">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <SettingsField label="Nombre de la empresa" value={name} onChange={setName} disabled={!isOwnerOrAdmin} placeholder="Mi Empresa S.L." />
-          <SettingsField label="Identificador (slug)" value={currentOrg?.slug || ''} onChange={() => {}} disabled mono hint="Se genera automáticamente." />
+      <section className="rounded-xl border border-line bg-panel shadow-soft">
+        <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <Building2 className="h-4.5 w-4.5" />
+            </span>
+            <h3 className="text-[15px] font-semibold text-fg">Empresa</h3>
+          </div>
+          <p className="text-xs text-muted">Datos de tu organización.</p>
         </div>
-        {isOwnerOrAdmin && (
-          <button onClick={saveName} disabled={savingName || name.trim() === currentOrg?.name} className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
-            {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
-          </button>
-        )}
-      </SettingsCard>
+        <div className="border-t border-line px-4 py-4 sm:px-5 sm:py-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <SettingsField label="Nombre de la empresa" value={name} onChange={setName} disabled={!isOwnerOrAdmin} placeholder="Mi Empresa S.L." />
+            <SettingsField label="Identificador (slug)" value={currentOrg?.slug || ''} onChange={() => {}} disabled mono hint="Se genera automáticamente." />
+          </div>
+          {isOwnerOrAdmin && (
+            <button onClick={saveName} disabled={savingName || name.trim() === currentOrg?.name} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
+              {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Guardar
+            </button>
+          )}
+        </div>
+      </section>
 
       {/* Seguridad */}
-      <SettingsCard icon={Lock} title="Seguridad" subtitle="Cambia tu contraseña">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <SettingsField label="Nueva contraseña" type="password" value={pw} onChange={setPw} placeholder="••••••••" autoComplete="new-password" />
-          <SettingsField label="Repite la contraseña" type="password" value={pw2} onChange={setPw2} placeholder="••••••••" autoComplete="new-password" />
+      <section className="rounded-xl border border-line bg-panel shadow-soft">
+        <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <Lock className="h-4.5 w-4.5" />
+            </span>
+            <h3 className="text-[15px] font-semibold text-fg">Seguridad</h3>
+          </div>
+          <p className="text-xs text-muted">Cambia tu contraseña.</p>
         </div>
-        <button onClick={changePw} disabled={savingPw || !pw} className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-fg transition hover:bg-inset disabled:opacity-50">
-          {savingPw ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} Cambiar contraseña
-        </button>
-      </SettingsCard>
+        <div className="border-t border-line px-4 py-4 sm:px-5 sm:py-5">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <SettingsField label="Nueva contraseña" type="password" value={pw} onChange={setPw} placeholder="••••••••" autoComplete="new-password" />
+            <SettingsField label="Repite la contraseña" type="password" value={pw2} onChange={setPw2} placeholder="••••••••" autoComplete="new-password" />
+          </div>
+          <button onClick={changePw} disabled={savingPw || !pw} className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line px-3 py-2.5 text-sm font-medium text-fg transition hover:bg-inset disabled:opacity-50">
+            {savingPw ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lock className="h-4 w-4" />} Cambiar contraseña
+          </button>
+        </div>
+      </section>
 
       {/* Apariencia */}
-      <SettingsCard icon={Palette} title="Apariencia" subtitle="Tema de la interfaz (preferencia personal)">
-        <ThemeSegmented />
-      </SettingsCard>
+      <section className="rounded-xl border border-line bg-panel shadow-soft">
+        <div className="space-y-3 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+              <Palette className="h-4.5 w-4.5" />
+            </span>
+            <h3 className="text-[15px] font-semibold text-fg">Apariencia</h3>
+          </div>
+          <p className="text-xs text-muted">Tema de la interfaz (preferencia personal).</p>
+        </div>
+        <div className="border-t border-line px-4 py-4 sm:px-5 sm:py-5">
+          <ThemeSegmented />
+        </div>
+      </section>
 
       {/* Zona de peligro (solo owner) */}
       {role === 'owner' && (

@@ -5,9 +5,6 @@ import { handleAuthDeepLink } from './deepLinks'
 export { isNative, isAndroid, isIOS, platform } from './platform'
 export { pushBackHandler } from './backStack'
 
-// Color de fondo de la barra de estado (Android) por tema, en hex sin alfa.
-const STATUS_BG = { dark: '#0A0B0D', light: '#F7F8FA' }
-
 let _statusBar = null
 async function statusBar() {
   if (!isNative || !hasPlugin('StatusBar')) return null
@@ -21,21 +18,23 @@ async function statusBar() {
   return _statusBar
 }
 
-// Sincroniza la barra de estado con el tema (texto claro/oscuro + fondo en Android).
+// Sincroniza la barra de estado con el tema (texto claro/oscuro). El fondo siempre
+// es transparente (edge-to-edge); el color real lo pone el CSS del Topbar con pt-safe.
 export async function syncStatusBar(resolvedTheme) {
   const sb = await statusBar()
   if (!sb) return
   const isDark = resolvedTheme === 'dark'
   try {
-    // Style.Dark = texto/iconos claros (para fondos oscuros); Style.Light = al revés.
     await sb.setStyle({ style: isDark ? 'DARK' : 'LIGHT' })
-    if (isAndroid) await sb.setBackgroundColor({ color: STATUS_BG[isDark ? 'dark' : 'light'] })
+    // No llamar setOverlaysWebView ni setBackgroundColor en Android:
+    // el edge-to-edge se gestiona nativamente en MainActivity.java y
+    // los flags deprecated del plugin StatusBar lo rompen.
   } catch {
     /* ignore */
   }
 }
 
-// Inicializa el shell nativo una sola vez. Idempotente. Devuelve cleanup.
+// Inicializa el shell nativo. Idempotente. Devuelve cleanup.
 let _initialized = false
 export async function initNativeShell() {
   if (!isNative || _initialized) return () => {}
@@ -45,13 +44,17 @@ export async function initNativeShell() {
 
   const cleanups = []
 
-  // Splash: la ocultamos cuando la web ya está montada (evita el "flash blanco").
+  // StatusBar: solo sincronizar estilo (DARK/LIGHT) al arrancar.
+  // El edge-to-edge se gestiona nativamente en MainActivity.java.
   try {
-    const { SplashScreen } = await import('@capacitor/splash-screen')
-    await SplashScreen.hide({ fadeOutDuration: 250 })
+    const sb = await statusBar()
+    if (sb) {
+      await sb.setStyle({ style: 'DARK' })
+    }
   } catch {
     /* ignore */
   }
+
 
   // Teclado: marca el body para que la UI pueda reaccionar (ocultar tab bar, etc.).
   try {
@@ -73,9 +76,7 @@ export async function initNativeShell() {
     const { App } = await import('@capacitor/app')
 
     cleanups.push((await App.addListener('backButton', () => {
-      // Primero las superficies efímeras (hojas, drawers, lock, palette…).
       if (runTopBackHandler()) return
-      // Nada que cerrar: salir de la app.
       App.exitApp()
     })).remove)
 

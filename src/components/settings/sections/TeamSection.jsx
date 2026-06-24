@@ -5,6 +5,7 @@ import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../state/AuthContext'
 import { useOrg } from '../../../state/OrgContext'
 import { useToast } from '../../../state/toast'
+import { INVITE_FN_BASE, authHeaders } from '../../../config/api'
 import { SettingsCard } from '../SettingsField'
 import Avatar from '../Avatar'
 
@@ -70,10 +71,29 @@ export default function TeamSection() {
     const e = email.trim().toLowerCase()
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return toast({ type: 'warning', title: 'Email no válido' })
     setBusy(true)
-    const { error } = await supabase.from('org_invitations').insert({ org_id: orgId, email: e, role: inviteRole, invited_by: user?.id ?? null })
+    try {
+      const res = await fetch(INVITE_FN_BASE, {
+        method: 'POST',
+        headers: { ...(await authHeaders()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: e, role: inviteRole }),
+      })
+      const body = await res.json()
+      if (!res.ok) {
+        toast({ type: 'error', title: 'Error', message: body.error || 'Error al invitar' })
+      } else if (body.emailSent) {
+        toast({ type: 'success', title: 'Invitación enviada', message: `Se ha enviado un email a ${e}` })
+        setEmail(''); load()
+      } else if (body.alreadyRegistered) {
+        toast({ type: 'success', title: 'Invitación creada', message: `${e} ya tiene cuenta. Se unirá al equipo cuando inicie sesión.` })
+        setEmail(''); load()
+      } else {
+        toast({ type: 'success', title: 'Invitación creada' })
+        setEmail(''); load()
+      }
+    } catch {
+      toast({ type: 'error', title: 'Error de red', message: 'No se pudo conectar con el servidor' })
+    }
     setBusy(false)
-    if (error) toast({ type: 'error', title: 'Error', message: error.message })
-    else { toast({ type: 'success', title: 'Invitación creada', message: 'Se activa cuando esa persona se registre con ese email.' }); setEmail(''); load() }
   }
 
   async function revokeInvite(id) {
@@ -138,7 +158,7 @@ export default function TeamSection() {
       </SettingsCard>
 
       {isOwnerOrAdmin && (
-        <SettingsCard icon={UserPlus} title="Invitar al equipo" subtitle="La invitación se activa cuando la persona se registra con ese email">
+        <SettingsCard icon={UserPlus} title="Invitar al equipo" subtitle="Se enviará un email de invitación a la persona">
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-0 flex-1">
               <label className="mb-1.5 block text-xs font-medium text-muted">Email</label>

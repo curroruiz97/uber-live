@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { CalendarDays, RefreshCw, Search, Upload } from 'lucide-react'
+import { CalendarDays, RefreshCw, Search, Upload, UserPlus, AlertTriangle, X } from 'lucide-react'
 import { useToast } from '../../state/toast'
+import { useSchedules } from '../../state/schedules'
 import { selection } from '../../native/haptics'
 import EmptyState from '../common/EmptyState'
-import { PLATFORMS } from './platforms'
+import { DAYS, PLATFORMS } from './platforms'
 import { useShiftPlanner } from './useShiftPlanner'
 import RiderCard from './RiderCard'
 
@@ -13,6 +14,8 @@ const TABS = [
   { id: 'glovo', label: 'Glovo' },
   { id: 'todos', label: 'Todos' },
 ]
+
+const KNOWN_CITIES = ['ZARAGOZA', 'MADRID', 'SALAMANCA', 'BILBAO', 'TENERIFE', 'SANTANDER', 'PAMPLONA']
 
 function Pill({ v, l }) {
   return (
@@ -51,17 +54,124 @@ function EmptyImport({ onImport, busy, canImport }) {
   )
 }
 
+function AddRiderDialog({ cities, prefill, onAdd, onClose }) {
+  const [name, setName] = useState(prefill?.name || '')
+  const [phone, setPhone] = useState(prefill?.phone || '')
+  const [riderCity, setRiderCity] = useState(prefill?.city || cities[0] || KNOWN_CITIES[0])
+  const [dia, setDia] = useState('lunes')
+  const [horaInicio, setHoraInicio] = useState('09:00')
+  const [horaFin, setHoraFin] = useState('14:00')
+  const [saving, setSaving] = useState(false)
+
+  const allCities = useMemo(() => {
+    const set = new Set([...KNOWN_CITIES, ...cities])
+    return [...set].sort()
+  }, [cities])
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true)
+    try {
+      await onAdd(name.trim(), riderCity, 'uber', { dia, hora_inicio: horaInicio, hora_fin: horaFin })
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-line bg-panel p-4 shadow-elev-2">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-fg">Añadir rider</h3>
+        <button onClick={onClose} className="rounded-lg p-1 text-faint transition hover:bg-inset hover:text-fg"><X className="h-4 w-4" /></button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-muted">Nombre completo *</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: María García López" required className="w-full rounded-lg border border-line bg-inset px-3 py-2 text-sm text-fg placeholder-faint outline-none focus:border-accent/60" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-muted">Teléfono (opcional)</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+34 612 345 678" className="w-full rounded-lg border border-line bg-inset px-3 py-2 text-sm text-fg placeholder-faint outline-none focus:border-accent/60" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-muted">Ciudad</label>
+            <select value={riderCity} onChange={(e) => setRiderCity(e.target.value)} className="w-full rounded-lg border border-line bg-inset px-3 py-2 text-sm text-fg outline-none focus:border-accent/60">
+              {allCities.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-muted">Día</label>
+            <select value={dia} onChange={(e) => setDia(e.target.value)} className="w-full rounded-lg border border-line bg-inset px-3 py-2 text-sm text-fg outline-none focus:border-accent/60">
+              {DAYS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-muted">Hora inicio</label>
+            <input type="time" value={horaInicio} onChange={(e) => setHoraInicio(e.target.value)} className="w-full rounded-lg border border-line bg-inset px-3 py-2 text-sm text-fg outline-none focus:border-accent/60" />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-muted">Hora fin</label>
+            <input type="time" value={horaFin} onChange={(e) => setHoraFin(e.target.value)} className="w-full rounded-lg border border-line bg-inset px-3 py-2 text-sm text-fg outline-none focus:border-accent/60" />
+          </div>
+        </div>
+        <button type="submit" disabled={saving || !name.trim()} className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 disabled:opacity-50">
+          {saving ? 'Guardando…' : 'Añadir rider'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function UnscheduledBanner({ riders, onAddRider }) {
+  const [expanded, setExpanded] = useState(false)
+  if (!riders.length) return null
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+      <button onClick={() => setExpanded((v) => !v)} className="flex w-full items-center gap-2.5 text-left">
+        <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-fg">{riders.length} rider{riders.length > 1 ? 's' : ''} con actividad sin horario</p>
+          <p className="text-[11px] text-muted">Tienen datos en los CSV pero no aparecen en el planificador de turnos.</p>
+        </div>
+      </button>
+      {expanded && (
+        <div className="mt-2 max-h-48 space-y-1 overflow-y-auto border-t border-amber-500/20 pt-2">
+          {riders.map((r) => (
+            <div key={r.riderKey} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs hover:bg-amber-500/5">
+              <div className="min-w-0">
+                <span className="font-medium text-fg">{r.name}</span>
+                <span className="ml-2 text-faint">{r.city || '—'}</span>
+                {r.phone && <span className="ml-2 text-faint">{r.phone}</span>}
+              </div>
+              <button onClick={() => onAddRider(r)} className="shrink-0 rounded-md bg-accent/10 px-2 py-0.5 text-[11px] font-medium text-accent transition hover:bg-accent/20">
+                Añadir turno
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ShiftPlannerView() {
   const { toast } = useToast()
+  const { unscheduledRiders } = useSchedules()
   const {
     shifts, absences, loading, busy, isOwnerOrAdmin, matchedPhones,
-    addShift, updateShift, removeShift, addAbsence, updateAbsence, removeAbsence, importSeed,
+    addShift, updateShift, removeShift, addAbsence, updateAbsence, removeAbsence, importSeed, reload,
   } = useShiftPlanner()
   const [tab, setTab] = useState('uber')
   const [city, setCity] = useState('all')
   const [q, setQ] = useState('')
+  const [showAddRider, setShowAddRider] = useState(false)
+  const [prefill, setPrefill] = useState(null)
 
-  // Envuelve los handlers async para notificar errores sin romper la UI.
   const guard = (fn) => async (...args) => {
     try {
       await fn(...args)
@@ -70,7 +180,6 @@ export default function ShiftPlannerView() {
     }
   }
 
-  // Construye los riders a partir de turnos + estados (incluye riders sin turnos pero con estado, p. ej. bajas).
   const riders = useMemo(() => {
     const map = new Map()
     const ensure = (provider, cty, name, phone) => {
@@ -110,6 +219,17 @@ export default function ShiftPlannerView() {
     }
   }
 
+  async function handleAddRider(name, riderCity, provider, patch) {
+    await addShift(name, riderCity, provider, patch)
+    reload()
+    toast({ type: 'success', title: 'Rider añadido', message: `${name} añadido a ${riderCity}.` })
+  }
+
+  function handleAddFromBanner(r) {
+    setPrefill(r)
+    setShowAddRider(true)
+  }
+
   const empty = !loading && riders.length === 0
 
   return (
@@ -125,11 +245,18 @@ export default function ShiftPlannerView() {
               <p className="text-xs text-muted">Turnos semanales por rider y estados (bajas, vacaciones, permisos…). Editable y guardado en la nube.</p>
             </div>
           </div>
-          {isOwnerOrAdmin && !empty && (
-            <button onClick={handleImport} disabled={busy} title="Reimportar los turnos desde los PDFs (reemplaza los actuales)" className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-fg transition hover:bg-inset disabled:opacity-50">
-              <RefreshCw className={clsx('h-3.5 w-3.5', busy && 'animate-spin')} /> Reimportar
-            </button>
-          )}
+          <div className="flex shrink-0 gap-2">
+            {isOwnerOrAdmin && !empty && (
+              <>
+                <button onClick={() => { setPrefill(null); setShowAddRider((v) => !v) }} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-fg transition hover:bg-inset">
+                  <UserPlus className="h-3.5 w-3.5" /> Añadir
+                </button>
+                <button onClick={handleImport} disabled={busy} title="Reimportar los turnos desde los PDFs (reemplaza los actuales)" className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-panel px-3 py-1.5 text-xs font-medium text-fg transition hover:bg-inset disabled:opacity-50">
+                  <RefreshCw className={clsx('h-3.5 w-3.5', busy && 'animate-spin')} /> Reimportar
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Pill v={riders.length} l="riders" />
@@ -138,6 +265,17 @@ export default function ShiftPlannerView() {
           <Pill v={matchedPhones} l="tel. cruzados" />
         </div>
       </div>
+
+      {showAddRider && isOwnerOrAdmin && (
+        <AddRiderDialog
+          cities={cities}
+          prefill={prefill}
+          onAdd={guard(handleAddRider)}
+          onClose={() => { setShowAddRider(false); setPrefill(null) }}
+        />
+      )}
+
+      {!empty && <UnscheduledBanner riders={unscheduledRiders || []} onAddRider={handleAddFromBanner} />}
 
       {empty ? (
         <EmptyImport onImport={handleImport} busy={busy} canImport={isOwnerOrAdmin} />

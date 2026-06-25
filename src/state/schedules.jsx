@@ -304,6 +304,18 @@ export function SchedulesProvider({ children }) {
     [cfg, demoMode, orgId],
   )
 
+  const unscheduledRiders = useMemo(() => {
+    const byKey = new Map()
+    for (const s of rawStats) {
+      if (!s.is_unscheduled || !s.rider_key) continue
+      const prev = byKey.get(s.rider_key)
+      if (!prev || s.work_date > prev.work_date) byKey.set(s.rider_key, s)
+    }
+    return [...byKey.values()]
+      .map((s) => ({ riderKey: s.rider_key, name: s.driver_name || s.rider_key, phone: s.driver_phone || null, city: canonCity(s.city), lastActive: s.work_date }))
+      .sort((a, b) => b.lastActive.localeCompare(a.lastActive))
+  }, [rawStats])
+
   const stats = useMemo(() => {
     const linkedRiders = new Set(shiftPlans.filter((s) => s.rider_key).map((s) => s.rider_key))
     return {
@@ -322,12 +334,12 @@ export function SchedulesProvider({ children }) {
       cfg, setCfg, saveCfg,
       roster, shiftPlans, absences, rawStats, imports,
       daily, alerts, unseenAlerts, suggestions, unlinkedNames,
-      stats, span, dataRange,
+      unscheduledRiders, stats, span, dataRange,
       loading, demoMode, isOwnerOrAdmin,
       importGlovoDaily, linkRiders, autoLink, linkOne,
       reload: demoMode ? loadDemo : loadReal,
     }),
-    [cfg, saveCfg, roster, shiftPlans, absences, rawStats, imports, daily, alerts, unseenAlerts, suggestions, unlinkedNames, stats, span, dataRange, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, loadDemo, loadReal],
+    [cfg, saveCfg, roster, shiftPlans, absences, rawStats, imports, daily, alerts, unseenAlerts, suggestions, unlinkedNames, unscheduledRiders, stats, span, dataRange, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, loadDemo, loadReal],
   )
 
   return <SchedulesContext.Provider value={value}>{children}</SchedulesContext.Provider>

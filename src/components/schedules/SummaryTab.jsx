@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import clsx from 'clsx'
-import { CheckCircle2, Users as UsersIcon, UserX, Timer, Power, Package, Percent, Gauge, TrendingUp, PieChart, Trophy, AlertTriangle, MapPin, Database } from 'lucide-react'
+import { CheckCircle2, Users as UsersIcon, UserX, Timer, Power, Package, Percent, Gauge, TrendingUp, PieChart, Trophy, AlertTriangle, MapPin, Database, UserPlus } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { useFleet } from '../../state/useFleetData'
 import { aggregateCompliance, buildRanking, statusBreakdown, trendByDate } from '../../domain/compliance'
@@ -68,8 +68,35 @@ function WorstRow({ r }) {
   )
 }
 
+function UnscheduledAlert({ riders }) {
+  const [open, setOpen] = useState(false)
+  if (!riders.length) return null
+  return (
+    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2.5 text-left">
+        <UserPlus className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-fg">{riders.length} rider{riders.length > 1 ? 's' : ''} sin horario asignado</p>
+          <p className="text-[11px] text-muted">Aparecen en los CSV de actividad pero no tienen turnos en Horarios. Pulsa para ver.</p>
+        </div>
+      </button>
+      {open && (
+        <div className="mt-2 max-h-40 space-y-0.5 overflow-y-auto border-t border-amber-500/20 pt-2">
+          {riders.map((r) => (
+            <div key={r.riderKey} className="flex items-center gap-2 rounded-lg px-2 py-1 text-xs">
+              <span className="font-medium text-fg">{r.name}</span>
+              <span className="text-faint">{r.city || '—'}</span>
+              <span className="ml-auto text-[11px] text-faint">últ. {r.lastActive?.split('-').reverse().join('/')}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SummaryTab() {
-  const { daily, cfg, loading, dataRange } = useSchedules()
+  const { daily, cfg, loading, dataRange, unscheduledRiders } = useSchedules()
   const { riders: fleetRiders } = useFleet()
   const ctl = usePeriodRange('week')
   const [city, setCity] = useState('all')
@@ -151,6 +178,8 @@ export default function SummaryTab() {
         <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint="viajes/hora activa" />
         <KpiCard label="Ausencias" value={agg.absences} icon={UserX} accent="red" hint={`${agg.partials} parciales · ${agg.justifiedDays} justif.`} />
       </div>
+
+      <UnscheduledAlert riders={unscheduledRiders || []} />
 
       <LiveComplianceCard />
 

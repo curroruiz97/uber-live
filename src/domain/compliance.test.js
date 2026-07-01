@@ -69,7 +69,7 @@ describe('computeDayCompliance', () => {
   })
   it('rawPct refleja sobre-cumplimiento sin tope', () => {
     const r = computeDayCompliance(240, stat({ active_hours: 6 }), cfg)
-    expect(r.compliancePct).toBe(100) // acotado para medias
+    expect(r.compliancePct).toBe(150)
     expect(r.rawPct).toBe(150)
   })
 })

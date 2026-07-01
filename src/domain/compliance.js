@@ -26,7 +26,7 @@ export const ALERT_TYPE = {
 export const DEFAULT_CFG = {
   timezone: 'Europe/Madrid',
   week_starts_on: 1,
-  hours_metric: 'active', // métrica que puntúa: 'active' | 'online'
+  hours_metric: 'online', // métrica que puntúa: 'active' | 'online'
   min_compliance_pct: 100, // % de horas planificadas para considerar "cumple"
   presence_threshold_hours: 0.5, // horas mínimas para contar como presente
   target_acceptance_pct: 90,
@@ -205,7 +205,7 @@ export function computeDayCompliance(plannedMin, actual, cfg = DEFAULT_CFG, abse
       compliancePct = 0
     } else {
       attended = true
-      compliancePct = Math.min(100, Math.round((workedMin / plannedMin) * 100))
+      compliancePct = Math.round((workedMin / plannedMin) * 100)
       status = compliancePct >= (c.min_compliance_pct ?? 100) ? 'cumple' : 'parcial'
     }
   } else {
@@ -338,7 +338,7 @@ export function aggregateCompliance(rows) {
     cancels: acc.cancel,
     acceptanceRatePct: assigned > 0 ? round((acc.accept / assigned) * 100) : null,
     cancelRatePct: acc.trips + acc.cancel > 0 ? round((acc.cancel / (acc.trips + acc.cancel)) * 100) : 0,
-    productivity: acc.activeHours > 0 ? round(acc.trips / acc.activeHours, 2) : 0,
+    productivity: round(acc.workedMin / 60, 1) > 0 ? round(acc.trips / round(acc.workedMin / 60, 1), 2) : 0,
     km: round(acc.totalKm, 1),
   }
 }

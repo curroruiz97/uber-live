@@ -46,7 +46,7 @@ function CitySplit({ split }) {
               <span className={clsx('shrink-0 font-semibold tabular-nums', pctTone(pct))}>{pct}% · {a.programmedDays} jorn.</span>
             </div>
             <div className="h-2.5 overflow-hidden rounded-full bg-inset">
-              <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: pctHex(pct) }} />
+              <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: pctHex(pct) }} />
             </div>
           </div>
         )
@@ -175,7 +175,7 @@ export default function SummaryTab() {
         <KpiCard label="Horas online" value={agg.onlineHours} decimals={1} suffix="h" icon={Power} accent="indigo" delta={dlt(agg.onlineHours, prev.onlineHours)} hint="conectado" />
         <KpiCard label="Viajes" value={agg.trips} icon={Package} accent="emerald" delta={dlt(agg.trips, prev.trips)} hint={`${agg.lateDeliveries} tarde`} />
         <KpiCard label="Aceptación" value={agg.acceptanceRatePct ?? 0} suffix="%" icon={Percent} accent="sky" hint={`cancel. ${agg.cancelRatePct}%`} />
-        <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint="viajes/hora activa" />
+        <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint={`viajes/hora ${cfg.hours_metric === 'online' ? 'online' : 'activa'}`} />
         <KpiCard label="Ausencias" value={agg.absences} icon={UserX} accent="red" hint={`${agg.partials} parciales · ${agg.justifiedDays} justif.`} />
       </div>
 

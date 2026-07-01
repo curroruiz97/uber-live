@@ -37,8 +37,8 @@ describe('aggregateCompliance', () => {
   it('tasa de aceptación = accept/(accept+reject)', () => {
     expect(aggregateCompliance([row({ accept: 9, reject: 1 })]).acceptanceRatePct).toBe(90)
   })
-  it('productividad = viajes/hora activa', () => {
-    expect(aggregateCompliance([row({ trips: 10, activeHours: 4 })]).productivity).toBe(2.5)
+  it('productividad = viajes/hora trabajada (workedMin)', () => {
+    expect(aggregateCompliance([row({ trips: 10, workedMin: 240 })]).productivity).toBe(2.5)
   })
   it('conjunto vacío devuelve ceros', () => {
     const a = aggregateCompliance([])

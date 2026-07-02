@@ -132,8 +132,8 @@ export default function RidersTab() {
                       <p className="text-[10px] text-faint">acept.</p>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold tabular-nums text-fg">{r.activeHours}h</p>
-                      <p className="text-[10px] text-faint">activas</p>
+                      <p className="text-xs font-semibold tabular-nums text-fg">{r.onlineHours}h</p>
+                      <p className="text-[10px] text-faint">online</p>
                     </div>
                     <div>
                       <p className="text-xs font-semibold tabular-nums text-fg">{r.absences}</p>

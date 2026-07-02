@@ -115,7 +115,7 @@ export default function RankingTab() {
                     <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Acept.</th>
                     <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Prod.</th>
                     <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">Viajes</th>
-                    <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Horas act.</th>
+                    <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Online</th>
                     <th className="px-3 py-2 text-right font-medium">Cumpl.</th>
                   </tr>
                 </thead>
@@ -130,7 +130,7 @@ export default function RankingTab() {
                       <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{r.acceptanceRatePct ?? '—'}{r.acceptanceRatePct != null ? '%' : ''}</td>
                       <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{r.productivity}</td>
                       <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted lg:table-cell">{r.trips}</td>
-                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted sm:table-cell">{r.activeHours}h</td>
+                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted sm:table-cell">{r.onlineHours}h</td>
                       <td className={clsx('px-3 py-2 text-right text-sm font-bold tabular-nums', pctTone(r.avgCompliancePct))}>{r.avgCompliancePct}%</td>
                     </tr>
                   ))}

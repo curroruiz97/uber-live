@@ -171,8 +171,8 @@ export default function SummaryTab() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard label="Cumplimiento" value={agg.avgCompliancePct} suffix="%" icon={CheckCircle2} accent="emerald" history={trend.map((t) => t.avgCompliancePct)} delta={dlt(agg.avgCompliancePct, prev.avgCompliancePct)} hint={`${agg.programmedDays} jornadas`} />
         <KpiCard label="Asistencia" value={agg.attendancePct} suffix="%" icon={UsersIcon} accent="sky" history={trend.map((t) => t.attendancePct)} delta={dlt(agg.attendancePct, prev.attendancePct)} hint={`${agg.present}/${agg.programmedDays}`} />
-        <KpiCard label="Horas activas" value={agg.activeHours} decimals={1} suffix="h" icon={Timer} accent="amber" delta={dlt(agg.activeHours, prev.activeHours)} hint={`de ${agg.plannedHours}h plan`} />
-        <KpiCard label="Horas online" value={agg.onlineHours} decimals={1} suffix="h" icon={Power} accent="indigo" delta={dlt(agg.onlineHours, prev.onlineHours)} hint="conectado" />
+        <KpiCard label="Horas online" value={agg.onlineHours} decimals={1} suffix="h" icon={Power} accent="amber" delta={dlt(agg.onlineHours, prev.onlineHours)} hint={`de ${agg.plannedHours}h plan`} />
+        <KpiCard label="Horas activas" value={agg.activeHours} decimals={1} suffix="h" icon={Timer} accent="indigo" delta={dlt(agg.activeHours, prev.activeHours)} hint="en entrega" />
         <KpiCard label="Viajes" value={agg.trips} icon={Package} accent="emerald" delta={dlt(agg.trips, prev.trips)} hint={`${agg.lateDeliveries} tarde`} />
         <KpiCard label="Aceptación" value={agg.acceptanceRatePct ?? 0} suffix="%" icon={Percent} accent="sky" hint={`cancel. ${agg.cancelRatePct}%`} />
         <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint={`viajes/hora ${cfg.hours_metric === 'online' ? 'online' : 'activa'}`} />

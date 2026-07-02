@@ -140,8 +140,8 @@ export default function RiderDetailSheet({ rider, onClose }) {
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <Stat icon={CheckCircle2} label="Cumplimiento" value={`${agg.avgCompliancePct}%`} tone={pctTone(agg.avgCompliancePct)} />
             <Stat icon={UsersIcon} label="Asistencia" value={`${agg.attendancePct}%`} />
-            <Stat icon={Timer} label="Horas activas" value={`${agg.activeHours}h`} />
             <Stat icon={Power} label="Horas online" value={`${agg.onlineHours}h`} />
+            <Stat icon={Timer} label="Horas activas" value={`${agg.activeHours}h`} />
             <Stat icon={Package} label="Viajes" value={agg.trips} />
             <Stat icon={Percent} label="Aceptación" value={agg.acceptanceRatePct != null ? `${agg.acceptanceRatePct}%` : '—'} />
             <Stat icon={Gauge} label="Productividad" value={agg.productivity} />
@@ -172,7 +172,7 @@ export default function RiderDetailSheet({ rider, onClose }) {
                     <th className="px-3 py-1.5 font-medium">Periodo</th>
                     <th className="px-3 py-1.5 text-right font-medium">Cumpl.</th>
                     <th className="px-3 py-1.5 text-right font-medium">Asist.</th>
-                    <th className="px-3 py-1.5 text-right font-medium">Activas</th>
+                    <th className="px-3 py-1.5 text-right font-medium">Online</th>
                     <th className="px-3 py-1.5 text-right font-medium">Viajes</th>
                   </tr>
                 </thead>
@@ -182,7 +182,7 @@ export default function RiderDetailSheet({ rider, onClose }) {
                       <td className="whitespace-nowrap px-3 py-1.5 text-xs text-fg">{bucketLabel(b)}</td>
                       <td className={clsx('px-3 py-1.5 text-right text-xs font-semibold tabular-nums', pctTone(b.avgCompliancePct))}>{b.avgCompliancePct}%</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted">{b.attendancePct}%</td>
-                      <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted">{b.activeHours}h</td>
+                      <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted">{b.onlineHours}h</td>
                       <td className="px-3 py-1.5 text-right text-xs tabular-nums text-muted">{b.trips}</td>
                     </tr>
                   ))}
@@ -199,7 +199,7 @@ export default function RiderDetailSheet({ rider, onClose }) {
                   const meta = STATUS_META[d.status]
                   const shift = shiftByDay.get(diaOfIso(d.date))
                   const plannedH = Math.round((d.plannedMin || 0) / 6) / 10
-                  const actualH = d.activeHours || 0
+                  const actualH = d.onlineHours || 0
                   const barMax = Math.max(plannedH, actualH, 1)
                   const barPlan = (plannedH / barMax) * 100
                   const barAct = (actualH / barMax) * 100
@@ -218,7 +218,7 @@ export default function RiderDetailSheet({ rider, onClose }) {
                           <span className="text-[10px] text-faint">extra</span>
                         )}
                         <div className="min-w-0 flex-1 truncate text-[10px] text-faint">
-                          {actualH.toFixed(1)}h act · {d.trips || 0} viajes
+                          {actualH.toFixed(1)}h online · {d.trips || 0} viajes
                         </div>
                         {d.compliancePct != null && <span className="shrink-0 text-xs font-semibold tabular-nums text-fg">{d.compliancePct}%</span>}
                         <span className={clsx('inline-flex shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium', meta?.chip)}>{meta?.label}</span>

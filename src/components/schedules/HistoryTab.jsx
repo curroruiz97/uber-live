@@ -121,8 +121,8 @@ export default function HistoryTab() {
                   <th className="px-3 py-2 font-medium">Rider</th>
                   <th className="hidden px-3 py-2 font-medium lg:table-cell">Ciudad</th>
                   <th className="hidden px-3 py-2 text-right font-medium sm:table-cell">Plan</th>
-                  <th className="px-3 py-2 text-right font-medium">Activas</th>
-                  <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Online</th>
+                  <th className="px-3 py-2 text-right font-medium">Online</th>
+                  <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Activas</th>
                   <th className="hidden px-3 py-2 text-right font-medium md:table-cell">Viajes</th>
                   <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">Acept.</th>
                   <th className="px-3 py-2 text-right font-medium">%</th>
@@ -139,8 +139,8 @@ export default function HistoryTab() {
                       <td className="px-3 py-2 text-sm text-fg">{r.name}</td>
                       <td className="hidden px-3 py-2 text-xs text-muted lg:table-cell">{r.city || '—'}</td>
                       <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted sm:table-cell">{r.scheduled ? h1(r.plannedMin) : '—'}</td>
-                      <td className="px-3 py-2 text-right text-sm tabular-nums text-muted">{(r.activeHours || 0).toFixed(1)}h</td>
-                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{(r.onlineHours || 0).toFixed(1)}h</td>
+                      <td className="px-3 py-2 text-right text-sm tabular-nums text-muted">{(r.onlineHours || 0).toFixed(1)}h</td>
+                      <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{(r.activeHours || 0).toFixed(1)}h</td>
                       <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted md:table-cell">{r.trips || 0}</td>
                       <td className="hidden px-3 py-2 text-right text-sm tabular-nums text-muted lg:table-cell">{assigned ? `${Math.round((r.accept / assigned) * 100)}%` : '—'}</td>
                       <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums text-fg">{r.compliancePct != null ? `${r.compliancePct}%` : '—'}</td>

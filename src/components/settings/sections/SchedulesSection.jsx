@@ -14,7 +14,7 @@ export default function SchedulesSection() {
   const ro = !isOwnerOrAdmin
 
   const [tz, setTz] = useState(cfg.timezone || 'Europe/Madrid')
-  const [hoursMetric, setHoursMetric] = useState(cfg.hours_metric || 'active')
+  const [hoursMetric, setHoursMetric] = useState(cfg.hours_metric || 'online')
   const [minPct, setMinPct] = useState(String(cfg.min_compliance_pct ?? 100))
   const [presence, setPresence] = useState(String(cfg.presence_threshold_hours ?? 0.5))
   const [targetAccept, setTargetAccept] = useState(String(cfg.target_acceptance_pct ?? 90))
@@ -23,7 +23,7 @@ export default function SchedulesSection() {
 
   useEffect(() => {
     setTz(cfg.timezone || 'Europe/Madrid')
-    setHoursMetric(cfg.hours_metric || 'active')
+    setHoursMetric(cfg.hours_metric || 'online')
     setMinPct(String(cfg.min_compliance_pct ?? 100))
     setPresence(String(cfg.presence_threshold_hours ?? 0.5))
     setTargetAccept(String(cfg.target_acceptance_pct ?? 90))

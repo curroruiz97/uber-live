@@ -175,7 +175,7 @@ export default function SummaryTab() {
         <KpiCard label="Horas activas" value={agg.activeHours} decimals={1} suffix="h" icon={Timer} accent="indigo" delta={dlt(agg.activeHours, prev.activeHours)} hint="en entrega" />
         <KpiCard label="Viajes" value={agg.trips} icon={Package} accent="emerald" delta={dlt(agg.trips, prev.trips)} hint={`${agg.lateDeliveries} tarde`} />
         <KpiCard label="Aceptación" value={agg.acceptanceRatePct ?? 0} suffix="%" icon={Percent} accent="sky" hint={`cancel. ${agg.cancelRatePct}%`} />
-        <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint={`viajes/hora ${cfg.hours_metric === 'online' ? 'online' : 'activa'}`} />
+        <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint="viajes/hora online" />
         <KpiCard label="Ausencias" value={agg.absences} icon={UserX} accent="red" hint={`${agg.partials} parciales · ${agg.justifiedDays} justif.`} />
       </div>
 

@@ -163,15 +163,13 @@ export function SchedulesProvider({ children }) {
       }
       const saved = st.data?.schedule_config || {}
       const merged = { ...DEFAULT_CFG, ...saved }
-      // Auto-migración v2: las configs antiguas tenían hours_metric='active' por defecto.
-      // Desde v2, el default correcto es 'online' (lo que Uber muestra).
-      if (!saved._v || saved._v < 2) {
-        merged.hours_metric = 'online'
-        merged._v = 2
+      merged.hours_metric = 'online'
+      if (!saved._v || saved._v < 3) {
+        merged._v = 3
         supabase.from('org_settings').upsert(
           { org_id: orgId, schedule_config: merged, updated_at: new Date().toISOString() },
           { onConflict: 'org_id' },
-        ).then(() => {})
+        ).then(({ error }) => { if (error) console.error('[schedules] migration v3 upsert failed:', error) })
       }
       setCfg(merged)
       setRoster((ro.data || []).map((r) => ({ riderKey: r.rider_key, name: r.name, phone: r.phone, provider: r.provider, vehicleType: r.vehicle_type, city: canonCity(r.city), active: r.active })))

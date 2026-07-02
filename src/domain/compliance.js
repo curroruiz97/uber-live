@@ -179,8 +179,8 @@ export function metricsFrom(s) {
   }
 }
 
-function workedHoursOf(m, cfg) {
-  return cfg.hours_metric === 'online' ? m.onlineHours : m.activeHours
+function workedHoursOf(m) {
+  return m.onlineHours
 }
 
 // Cumplimiento de UN día. plannedMin: minutos planificados (0 = no programado).
@@ -188,7 +188,7 @@ function workedHoursOf(m, cfg) {
 export function computeDayCompliance(plannedMin, actual, cfg = DEFAULT_CFG, absenceTipo = null) {
   const c = { ...DEFAULT_CFG, ...cfg }
   const m = metricsFrom(actual)
-  const workedH = workedHoursOf(m, c)
+  const workedH = workedHoursOf(m)
   const workedMin = Math.round(workedH * 60)
   const threshold = c.presence_threshold_hours ?? 0.5
 

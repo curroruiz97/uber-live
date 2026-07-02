@@ -14,7 +14,6 @@ export default function SchedulesSection() {
   const ro = !isOwnerOrAdmin
 
   const [tz, setTz] = useState(cfg.timezone || 'Europe/Madrid')
-  const [hoursMetric, setHoursMetric] = useState(cfg.hours_metric || 'online')
   const [minPct, setMinPct] = useState(String(cfg.min_compliance_pct ?? 100))
   const [presence, setPresence] = useState(String(cfg.presence_threshold_hours ?? 0.5))
   const [targetAccept, setTargetAccept] = useState(String(cfg.target_acceptance_pct ?? 90))
@@ -23,7 +22,6 @@ export default function SchedulesSection() {
 
   useEffect(() => {
     setTz(cfg.timezone || 'Europe/Madrid')
-    setHoursMetric(cfg.hours_metric || 'online')
     setMinPct(String(cfg.min_compliance_pct ?? 100))
     setPresence(String(cfg.presence_threshold_hours ?? 0.5))
     setTargetAccept(String(cfg.target_acceptance_pct ?? 90))
@@ -35,7 +33,7 @@ export default function SchedulesSection() {
     try {
       await saveCfg({
         timezone: tz,
-        hours_metric: hoursMetric === 'online' ? 'online' : 'active',
+        hours_metric: 'online',
         min_compliance_pct: Math.min(200, Math.max(0, Number(minPct) || 0)),
         presence_threshold_hours: Math.max(0, Number(presence) || 0),
         target_acceptance_pct: Math.min(100, Math.max(0, Number(targetAccept) || 0)),
@@ -57,19 +55,6 @@ export default function SchedulesSection() {
 
       <SettingsCard icon={CalendarClock} title="Cumplimiento de riders" subtitle="Reglas del cruce turnos × actividad real">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted">Horas que puntúan</label>
-            <select
-              value={hoursMetric}
-              onChange={(e) => setHoursMetric(e.target.value)}
-              disabled={ro}
-              className="w-full rounded-lg border border-line bg-inset px-3 py-2.5 text-sm text-fg outline-none focus:border-accent/60 disabled:opacity-60"
-            >
-              <option value="active">Horas activas (disponible + en ruta + en entrega)</option>
-              <option value="online">Horas online (todo el tiempo conectado)</option>
-            </select>
-            <p className="mt-1 text-[11px] text-faint">Se muestran ambas; esta decide el estado (cumple/parcial).</p>
-          </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted">Zona horaria</label>
             <select

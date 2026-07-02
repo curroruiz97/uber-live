@@ -9,7 +9,7 @@ import {
   DEFAULT_CFG,
 } from './compliance'
 
-const cfg = { ...DEFAULT_CFG, hours_metric: 'active', min_compliance_pct: 100, presence_threshold_hours: 0.5 }
+const cfg = { ...DEFAULT_CFG, min_compliance_pct: 100, presence_threshold_hours: 0.5 }
 
 // Fila de actividad real (snake_case, como en rider_daily_stats).
 const stat = (over = {}) => ({
@@ -29,19 +29,19 @@ describe('diaOfIso', () => {
 
 describe('computeDayCompliance', () => {
   it('cumple al trabajar el 100% del turno (umbral 100)', () => {
-    const r = computeDayCompliance(240, stat({ active_hours: 4 }), cfg)
+    const r = computeDayCompliance(240, stat({ online_hours: 4 }), cfg)
     expect(r.status).toBe('cumple')
     expect(r.workedMin).toBe(240)
     expect(r.compliancePct).toBe(100)
     expect(r.attended).toBe(true)
   })
   it('parcial por debajo del umbral', () => {
-    const r = computeDayCompliance(240, stat({ active_hours: 3 }), cfg)
+    const r = computeDayCompliance(240, stat({ online_hours: 3 }), cfg)
     expect(r.status).toBe('parcial')
     expect(r.compliancePct).toBe(75)
   })
   it('ausente cuando no llega al umbral de presencia', () => {
-    const r = computeDayCompliance(240, stat({ active_hours: 0.2 }), cfg)
+    const r = computeDayCompliance(240, stat({ online_hours: 0.2 }), cfg)
     expect(r.status).toBe('ausente')
     expect(r.compliancePct).toBe(0)
     expect(r.attended).toBe(false)
@@ -55,20 +55,20 @@ describe('computeDayCompliance', () => {
     expect(r.absenceTipo).toBe('vacaciones')
   })
   it('extra: trabaja sin turno planificado', () => {
-    const r = computeDayCompliance(0, stat({ active_hours: 3 }), cfg)
+    const r = computeDayCompliance(0, stat({ online_hours: 3 }), cfg)
     expect(r.status).toBe('extra')
     expect(r.scheduled).toBe(false)
   })
   it('no_programado: ni turno ni actividad relevante', () => {
-    expect(computeDayCompliance(0, stat({ active_hours: 0.1 }), cfg).status).toBe('no_programado')
+    expect(computeDayCompliance(0, stat({ online_hours: 0.1 }), cfg).status).toBe('no_programado')
   })
-  it('respeta la métrica de horas (online vs active)', () => {
+  it('siempre usa horas online para el cálculo', () => {
     const s = stat({ online_hours: 4, active_hours: 2 })
-    expect(computeDayCompliance(240, s, { ...cfg, hours_metric: 'online' }).status).toBe('cumple')
-    expect(computeDayCompliance(240, s, { ...cfg, hours_metric: 'active' }).status).toBe('parcial')
+    expect(computeDayCompliance(240, s, cfg).status).toBe('cumple')
+    expect(computeDayCompliance(240, s, cfg).workedMin).toBe(240)
   })
   it('rawPct refleja sobre-cumplimiento sin tope', () => {
-    const r = computeDayCompliance(240, stat({ active_hours: 6 }), cfg)
+    const r = computeDayCompliance(240, stat({ online_hours: 6 }), cfg)
     expect(r.compliancePct).toBe(150)
     expect(r.rawPct).toBe(150)
   })
@@ -120,29 +120,29 @@ describe('buildDaily', () => {
     { rider_key: 'a', rider_name: 'ANA', provider: 'uber', city: 'Zaragoza', dia: 'martes', hora_inicio: '10:00', hora_fin: '14:00' },
   ]
   it('cruza turnos con actividad y normaliza la ciudad (sin duplicar)', () => {
-    const stats = [stat({ rider_key: 'a', work_date: '2026-06-01', city: 'ZARAGOZA', active_hours: 4 })] // lunes
+    const stats = [stat({ rider_key: 'a', work_date: '2026-06-01', city: 'ZARAGOZA', online_hours: 4 })] // lunes
     const a = buildDaily(plans, [], stats, '2026-06-01', '2026-06-01', cfg).find((r) => r.date === '2026-06-01')
     expect(a.status).toBe('cumple')
     expect(a.city).toBe('ZARAGOZA')
   })
   it('no inventa ausencias fuera de la ventana de actividad del rider', () => {
     // 'a' solo tiene actividad el 06-01; el martes 06-02 queda fuera de [06-01,06-01].
-    const stats = [stat({ rider_key: 'a', work_date: '2026-06-01', active_hours: 4 })]
+    const stats = [stat({ rider_key: 'a', work_date: '2026-06-01', online_hours: 4 })]
     const daily = buildDaily(plans, [], stats, '2026-06-01', '2026-06-02', cfg)
     expect(daily.find((r) => r.date === '2026-06-02')).toBeUndefined()
   })
   it('marca ausente un día programado SIN actividad dentro de la ventana', () => {
     const stats = [
-      stat({ rider_key: 'a', work_date: '2026-06-01', active_hours: 4 }),
-      stat({ rider_key: 'a', work_date: '2026-06-08', active_hours: 4 }),
+      stat({ rider_key: 'a', work_date: '2026-06-01', online_hours: 4 }),
+      stat({ rider_key: 'a', work_date: '2026-06-08', online_hours: 4 }),
     ]
     const mar = buildDaily(plans, [], stats, '2026-06-01', '2026-06-08', cfg).find((r) => r.date === '2026-06-02')
     expect(mar.status).toBe('ausente') // martes programado, en ventana [06-01,06-08], sin actividad
   })
   it('ignora la actividad de riders sin turno (no son de la flota)', () => {
     const stats = [
-      stat({ rider_key: 'a', work_date: '2026-06-01', active_hours: 4 }),
-      stat({ rider_key: 'z', work_date: '2026-06-01', driver_name: 'AJENO', active_hours: 5 }),
+      stat({ rider_key: 'a', work_date: '2026-06-01', online_hours: 4 }),
+      stat({ rider_key: 'z', work_date: '2026-06-01', driver_name: 'AJENO', online_hours: 5 }),
     ]
     const daily = buildDaily(plans, [], stats, '2026-06-01', '2026-06-01', cfg)
     expect(daily.find((r) => r.riderKey === 'z')).toBeUndefined()

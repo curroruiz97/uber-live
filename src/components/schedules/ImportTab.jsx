@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import clsx from 'clsx'
-import { UploadCloud, FileText, Loader2, CheckCircle2, X } from 'lucide-react'
+import { UploadCloud, FileText, Loader2, CheckCircle2, X, AlertTriangle } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { useToast } from '../../state/toast'
 import EmptyState from '../common/EmptyState'
@@ -104,17 +104,32 @@ export default function ImportTab() {
             )}
 
             {result && !result.demo && (
-              <div className="flex items-start gap-3 rounded-xl border border-green-500/30 bg-green-500/5 p-3">
-                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
-                <div className="text-xs text-fg">
-                  <p className="font-semibold">Importación completada</p>
-                  <p className="mt-0.5 text-muted">
-                    {result.files} fichero(s) · <span className="font-medium text-fg">{result.rowsUpserted}</span> jornadas ·{' '}
-                    <span className="font-medium text-fg">{result.newRiders}</span> riders nuevos
-                    {result.skipped ? ` · ${result.skipped} omitidas (exportación más antigua)` : ''}
-                  </p>
-                  {result.dateMin && <p className="mt-0.5 text-faint">Rango: {fmtDate(result.dateMin)} – {fmtDate(result.dateMax)}</p>}
+              <div className="space-y-2">
+                <div className="flex items-start gap-3 rounded-xl border border-green-500/30 bg-green-500/5 p-3">
+                  <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-600 dark:text-green-400" />
+                  <div className="text-xs text-fg">
+                    <p className="font-semibold">Importación completada</p>
+                    <p className="mt-0.5 text-muted">
+                      {result.files} fichero(s) · <span className="font-medium text-fg">{result.rowsUpserted}</span> jornadas ·{' '}
+                      <span className="font-medium text-fg">{result.newRiders}</span> riders nuevos
+                      {result.skipped ? ` · ${result.skipped} omitidas (exportación más antigua)` : ''}
+                    </p>
+                    {result.dateMin && <p className="mt-0.5 text-faint">Rango: {fmtDate(result.dateMin)} – {fmtDate(result.dateMax)}</p>}
+                  </div>
                 </div>
+                {result.suspect > 0 && (
+                  <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                    <div className="text-xs text-fg">
+                      <p className="font-semibold">{result.suspect} registros omitidos por datos parciales</p>
+                      <p className="mt-0.5 text-muted">
+                        Uber no ha procesado las horas online de{' '}
+                        {(result.suspectDates || []).map((d) => fmtDate(d)).join(', ')}.
+                        Los viajes aparecen pero las horas están congeladas. Reimporta un CSV posterior para corregirlo.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

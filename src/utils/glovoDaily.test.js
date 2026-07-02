@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseGlovoFilenameTs, aggregateGlovoRows, buildPayloadFromCsv, digits } from './glovoDaily'
+import { parseGlovoFilenameTs, aggregateGlovoRows, buildPayloadFromCsv, digits, isSuspectRow } from './glovoDaily'
 
 describe('parseGlovoFilenameTs', () => {
   it('extrae el timestamp de exportación del nombre', () => {
@@ -69,6 +69,24 @@ describe('aggregateGlovoRows', () => {
   })
 })
 
+describe('isSuspectRow', () => {
+  it('detecta horas congeladas: muchos viajes con horas ínfimas', () => {
+    expect(isSuspectRow({ num_of_trips: 21, online_hours: 0.11 })).toBe(true)
+    expect(isSuspectRow({ num_of_trips: 16, online_hours: 0.25 })).toBe(true)
+  })
+  it('no marca datos normales como sospechosos', () => {
+    expect(isSuspectRow({ num_of_trips: 21, online_hours: 8.4 })).toBe(false)
+    expect(isSuspectRow({ num_of_trips: 7, online_hours: 4.8 })).toBe(false)
+  })
+  it('no marca filas con pocos viajes', () => {
+    expect(isSuspectRow({ num_of_trips: 2, online_hours: 0.1 })).toBe(false)
+    expect(isSuspectRow({ num_of_trips: 0, online_hours: 0 })).toBe(false)
+  })
+  it('marca trips>0 con online_hours=0', () => {
+    expect(isSuspectRow({ num_of_trips: 10, online_hours: 0 })).toBe(true)
+  })
+})
+
 describe('buildPayloadFromCsv', () => {
   it('parsea un CSV completo a payload con rango de fechas', () => {
     const csv = [
@@ -82,5 +100,18 @@ describe('buildPayloadFromCsv', () => {
     expect(res.dateMin).toBe('2026-06-09')
     expect(res.dateMax).toBe('2026-06-10')
     expect(res.riders).toBe(1)
+    expect(res.suspect).toBe(0)
+  })
+  it('omite filas con horas congeladas y reporta las fechas afectadas', () => {
+    const csv = [
+      'datestr,driver_uuid,driver_name,driver_number,market_name,online_hours,active_hours,num_of_trips',
+      '2026-06-09 00:00:00.000,uuid-1,ANA,611,SANTANDER,8,6,21',
+      '2026-06-10 00:00:00.000,uuid-1,ANA,611,SANTANDER,0.1,0.1,20',
+    ].join('\n')
+    const res = buildPayloadFromCsv(csv, 'COURIER_DAILY_SAPIENS_20260611_065644.csv')
+    expect(res.rows).toHaveLength(1)
+    expect(res.rows[0].work_date).toBe('2026-06-09')
+    expect(res.suspect).toBe(1)
+    expect(res.suspectDates).toEqual(['2026-06-10'])
   })
 })

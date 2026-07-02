@@ -161,6 +161,16 @@ export function expandSchedule(shiftPlans, absences, from, to) {
   return [...acc.values()]
 }
 
+// Detecta datos con horas online congeladas (bug del CSV de Uber: el día más reciente
+// tiene horas sin procesar mientras los viajes sí se actualizan).
+export function isSuspectMetrics(s) {
+  if (!s) return false
+  const trips = Number(s.num_of_trips) || 0
+  const hours = Number(s.online_hours) || 0
+  if (trips < 5) return false
+  return hours <= 0 || trips / hours > 10
+}
+
 // Extrae las métricas (camelCase) de una fila de rider_daily_stats (snake_case) o ceros.
 export function metricsFrom(s) {
   if (!s) {
@@ -261,9 +271,10 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
     const key = `${p.riderKey}|${p.date}`
     seen.add(key)
     const a = statByKey.get(key) || null
-    const comp = computeDayCompliance(p.plannedMin, a, cfg, p.absenceTipo)
+    const suspect = isSuspectMetrics(a)
+    const comp = computeDayCompliance(p.plannedMin, suspect ? null : a, cfg, p.absenceTipo)
     out.push({
-      riderKey: p.riderKey, name: p.name, provider: p.provider, city: canonCity(a?.city || p.city), date: p.date, ...comp,
+      riderKey: p.riderKey, name: p.name, provider: p.provider, city: canonCity(a?.city || p.city), date: p.date, suspect, ...comp,
     })
   }
 
@@ -272,11 +283,12 @@ export function buildDaily(shiftPlans, absences, stats, from, to, cfg = DEFAULT_
     if (!scheduledKeys.has(s.rider_key)) continue
     const key = `${s.rider_key}|${s.work_date}`
     if (seen.has(key)) continue
-    const comp = computeDayCompliance(0, s, cfg, null)
+    const suspect = isSuspectMetrics(s)
+    const comp = computeDayCompliance(0, suspect ? null : s, cfg, null)
     if (comp.status === 'no_programado') continue
     out.push({
       riderKey: s.rider_key, name: s.driver_name || s.rider_key, provider: s.source_provider || 'glovo',
-      city: canonCity(s.city), date: s.work_date, ...comp,
+      city: canonCity(s.city), date: s.work_date, suspect, ...comp,
     })
   }
   return out

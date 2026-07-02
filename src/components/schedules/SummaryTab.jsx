@@ -119,6 +119,12 @@ export default function SummaryTab() {
   const { from, to } = ctl.range
   const inPeriod = useMemo(() => daily.filter((d) => inRange(d.date, from, to)), [daily, from, to])
 
+  const suspectDates = useMemo(() => {
+    const dates = new Set()
+    for (const d of inPeriod) if (d.suspect) dates.add(d.date)
+    return dates
+  }, [inPeriod])
+
   const liveRows = useMemo(() => {
     if (!fleetByPhone.size) return inPeriod
     return inPeriod.map((row) => {
@@ -178,6 +184,22 @@ export default function SummaryTab() {
         <KpiCard label="Productividad" value={agg.productivity} decimals={2} icon={Gauge} accent="indigo" hint="viajes/hora online" />
         <KpiCard label="Ausencias" value={agg.absences} icon={UserX} accent="red" hint={`${agg.partials} parciales · ${agg.justifiedDays} justif.`} />
       </div>
+
+      {suspectDates.size > 0 && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-xs text-fg">
+              <p className="font-semibold">Datos parciales — horas online pendientes de Uber</p>
+              <p className="mt-0.5 text-muted">
+                Las fechas {[...suspectDates].sort().map((d) => d.split('-').reverse().join('/')).join(', ')} tienen
+                viajes registrados pero horas online sin procesar por Uber. Estos días se excluyen del cálculo hasta
+                que se importe un CSV con datos completos.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <UnscheduledAlert riders={unscheduledRiders || []} />
 

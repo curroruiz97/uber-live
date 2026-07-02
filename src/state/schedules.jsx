@@ -232,13 +232,17 @@ export function SchedulesProvider({ children }) {
       let rowsUpserted = 0
       let newRiders = 0
       let skipped = 0
+      let suspectTotal = 0
+      const suspectDatesAll = new Set()
       let dateMin = null
       let dateMax = null
       for (let i = 0; i < arr.length; i += 1) {
         const f = arr[i]
         onProgress?.({ phase: 'parsing', file: f.name, index: i, total: arr.length })
         const text = await f.text()
-        const { rows, exportedAt } = buildPayloadFromCsv(text, f.name)
+        const { rows, exportedAt, suspect, suspectDates } = buildPayloadFromCsv(text, f.name)
+        suspectTotal += suspect || 0
+        for (const d of suspectDates || []) suspectDatesAll.add(d)
         if (!rows.length) continue
         const batches = chunk(rows, 500)
         for (let b = 0; b < batches.length; b += 1) {
@@ -255,7 +259,7 @@ export function SchedulesProvider({ children }) {
         }
       }
       await loadReal()
-      return { files: arr.length, rowsUpserted, newRiders, skipped, dateMin, dateMax }
+      return { files: arr.length, rowsUpserted, newRiders, skipped, dateMin, dateMax, suspect: suspectTotal, suspectDates: [...suspectDatesAll] }
     },
     [demoMode, orgId, loadReal],
   )

@@ -75,21 +75,34 @@ export function aggregateGlovoRows(rows) {
   })
 }
 
+// Detecta filas con online_hours congeladas: muchos viajes pero horas imposiblemente bajas.
+// Uber a veces exporta el día más reciente con horas sin procesar.
+export function isSuspectRow(r) {
+  const trips = r.num_of_trips || 0
+  const hours = r.online_hours || 0
+  if (trips < 5) return false
+  return hours <= 0 || trips / hours > 10
+}
+
 // Parsea un fichero (texto + nombre) en payload listo para el RPC.
-// Devuelve { rows, exportedAt, dateMin, dateMax, riders, perRowTs }.
+// Devuelve { rows, exportedAt, dateMin, dateMax, riders, perRowTs, suspect }.
 export function buildPayloadFromCsv(text, filename) {
   const { rows } = parseCsv(text)
   const agg = aggregateGlovoRows(rows)
   const exportedAt = parseGlovoFilenameTs(filename)
-  const dates = agg.map((r) => r.work_date).filter(Boolean).sort()
-  const perRowTs = agg.some((r) => r.source_exported_at)
+  const suspect = agg.filter(isSuspectRow)
+  const clean = agg.filter((r) => !isSuspectRow(r))
+  const dates = clean.map((r) => r.work_date).filter(Boolean).sort()
+  const perRowTs = clean.some((r) => r.source_exported_at)
   return {
-    rows: agg,
+    rows: clean,
     exportedAt,
     perRowTs,
     dateMin: dates[0] || null,
     dateMax: dates[dates.length - 1] || null,
-    riders: new Set(agg.map((r) => r.rider_key)).size,
+    riders: new Set(clean.map((r) => r.rider_key)).size,
+    suspect: suspect.length,
+    suspectDates: [...new Set(suspect.map((r) => r.work_date))],
   }
 }
 

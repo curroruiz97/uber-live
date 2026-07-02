@@ -6,6 +6,7 @@ import {
   computeDayCompliance,
   buildDaily,
   canonCity,
+  isSuspectMetrics,
   DEFAULT_CFG,
 } from './compliance'
 
@@ -105,6 +106,18 @@ describe('expandAbsences', () => {
   })
 })
 
+describe('isSuspectMetrics', () => {
+  it('detecta horas congeladas del CSV de Uber', () => {
+    expect(isSuspectMetrics({ num_of_trips: 21, online_hours: 0.11 })).toBe(true)
+    expect(isSuspectMetrics({ num_of_trips: 10, online_hours: 0 })).toBe(true)
+  })
+  it('no marca datos normales', () => {
+    expect(isSuspectMetrics({ num_of_trips: 21, online_hours: 8.4 })).toBe(false)
+    expect(isSuspectMetrics(null)).toBe(false)
+    expect(isSuspectMetrics({ num_of_trips: 0, online_hours: 0 })).toBe(false)
+  })
+})
+
 describe('canonCity', () => {
   it('unifica mayúsculas, acentos y sufijo de país', () => {
     expect(canonCity('Zaragoza')).toBe('ZARAGOZA')
@@ -138,6 +151,14 @@ describe('buildDaily', () => {
     ]
     const mar = buildDaily(plans, [], stats, '2026-06-01', '2026-06-08', cfg).find((r) => r.date === '2026-06-02')
     expect(mar.status).toBe('ausente') // martes programado, en ventana [06-01,06-08], sin actividad
+  })
+  it('marca como suspect y excluye del cálculo datos con horas congeladas', () => {
+    const stats = [stat({ rider_key: 'a', work_date: '2026-06-01', online_hours: 0.1, num_of_trips: 20 })]
+    const daily = buildDaily(plans, [], stats, '2026-06-01', '2026-06-01', cfg)
+    const d = daily.find((r) => r.date === '2026-06-01')
+    expect(d.suspect).toBe(true)
+    expect(d.status).toBe('ausente')
+    expect(d.workedMin).toBe(0)
   })
   it('ignora la actividad de riders sin turno (no son de la flota)', () => {
     const stats = [

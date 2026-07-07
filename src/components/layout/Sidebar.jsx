@@ -10,12 +10,14 @@ import {
   ChevronsRight,
 } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
+import { useOrg } from '../../state/OrgContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import { useMensatek } from '../../state/mensatek'
 import { useSchedules } from '../../state/schedules'
 import WhatsAppIcon from '../common/WhatsAppIcon'
 import MensatekIcon from '../common/MensatekIcon'
 import Logo from '../common/Logo'
+import { VIEWER_NAV } from '../../config/nav'
 
 const NAV = [
   { id: 'dashboard', label: 'Mapas', icon: MapIcon },
@@ -30,9 +32,11 @@ const NAV = [
 
 export default function Sidebar({ mobileOpen, onCloseMobile }) {
   const { sidebarCollapsed, toggleSidebar, activeNav, setActiveNav } = useApp()
+  const { isViewer } = useOrg()
   const { messagesToday: waToday } = useWhatsApp()
   const { messagesToday: mkToday } = useMensatek()
   const { unseenAlerts } = useSchedules()
+  const navItems = isViewer ? NAV.filter((n) => VIEWER_NAV.has(n.id)) : NAV
 
   return (
     <>
@@ -63,7 +67,7 @@ export default function Sidebar({ mobileOpen, onCloseMobile }) {
         </div>
 
         <nav className="flex-1 space-y-1 p-2.5">
-          {NAV.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             const active = activeNav === item.id
             const badge = item.id === 'whatsapp' ? waToday : item.id === 'mensatek' ? mkToday : item.id === 'cumplimiento' ? unseenAlerts : 0

@@ -1,9 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { POLL_INTERVAL_MS } from '../config/constants'
 import { createMockSource } from '../mock/mockEngine'
 import { createUberClient } from '../api/uberClient'
 import { createGlovoClient } from '../api/glovoClient'
 import { normalizeFleet, normalizeGlovoFleet } from '../api/normalize'
+import { cityFilterFor } from '../utils/cityScope'
 
 export const FleetContext = createContext(null)
 
@@ -235,8 +236,14 @@ function seedHistory(kpis) {
   return out
 }
 
-export function useFleetData(connection, provider = 'uber') {
+export function useFleetData(connection, provider = 'uber', cityScope = null) {
   const { demoMode, token, environment, connected } = connection
+
+  // Filtro por ámbito de ciudades (rol "visor"): null => sin restricción. Se memoiza por
+  // el contenido del ámbito para no re-suscribir la fuente en cada render.
+  const scopeKey = Array.isArray(cityScope) ? [...cityScope].sort().join('|') : ''
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cityFilter = useMemo(() => cityFilterFor(cityScope), [scopeKey])
 
   const [snapshot, setSnapshot] = useState({ riders: [], deliveries: [] })
   const [events, setEvents] = useState([])
@@ -262,14 +269,23 @@ export function useFleetData(connection, provider = 'uber') {
 
   const applySnapshot = useCallback((snap, isInitial) => {
     const now = Date.now()
+    // Rol "visor": recorta los riders (y sus entregas) a las ciudades permitidas ANTES de
+    // derivar eventos y KPIs, para que todo lo visible respete el ámbito.
+    const riders = cityFilter ? (snap.riders || []).filter((r) => cityFilter(r.zone?.city)) : (snap.riders || [])
+    const deliveries = cityFilter
+      ? (snap.deliveries || []).filter((d) => {
+          const c = d.rider?.zone?.city ?? d.zone?.city ?? d.city
+          return c ? cityFilter(c) : true // sin ciudad resoluble: no la descartamos (evita vaciar KPIs)
+        })
+      : (snap.deliveries || [])
     let newEvents = []
     if (isInitial) {
-      for (const d of snap.deliveries) {
+      for (const d of deliveries) {
         if (d.outcome === 'active') seenRef.current.active.add(d.id)
       }
-    } else if (snap.deliveries.length > 0) {
+    } else if (deliveries.length > 0) {
       // Demo (entregas): eventos por diff de entregas + acumulación de completadas.
-      newEvents = deriveEvents(prevDeliveriesRef.current, snap.deliveries, seenRef.current, now)
+      newEvents = deriveEvents(prevDeliveriesRef.current, deliveries, seenRef.current, now)
       for (const e of newEvents) {
         if (e.type === 'completed') {
           accRef.current.completedCount += 1
@@ -281,18 +297,18 @@ export function useFleetData(connection, provider = 'uber') {
       }
     } else {
       // Real (flota): eventos por cambios de estado de conductor entre polls.
-      newEvents = deriveStatusEvents(prevRidersRef.current, snap.riders, now)
+      newEvents = deriveStatusEvents(prevRidersRef.current, riders, now)
     }
-    prevDeliveriesRef.current = snap.deliveries
-    prevRidersRef.current = snap.riders
+    prevDeliveriesRef.current = deliveries
+    prevRidersRef.current = riders
 
     if (snap.meta) metaRef.current = snap.meta
-    setSnapshot({ riders: snap.riders, deliveries: snap.deliveries })
+    setSnapshot({ riders, deliveries })
     if (newEvents.length) {
       setEvents((prev) => [...newEvents.reverse(), ...prev].slice(0, 60))
     }
 
-    const nextKpis = deriveKpis(snap.riders, snap.deliveries, accRef.current, baselineRef.current, metaRef.current)
+    const nextKpis = deriveKpis(riders, deliveries, accRef.current, baselineRef.current, metaRef.current)
     if (isInitial || !historyRef.current) {
       historyRef.current = seedHistory(nextKpis)
     } else {
@@ -318,7 +334,7 @@ export function useFleetData(connection, provider = 'uber') {
     setKpiHistory({ ...historyRef.current })
     setKpis(nextKpis)
     setLastUpdated(now)
-  }, [])
+  }, [cityFilter])
 
   const refreshNow = useCallback(() => {
     const source = sourceRef.current

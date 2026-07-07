@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { supabase } from '../lib/supabase'
 import { useAuth } from './AuthContext'
 import { setActiveOrgId } from '../config/api'
+import { normalizeScope, cityInScope } from '../utils/cityScope'
 
 // Organización activa (tenant). Carga las orgs del usuario desde org_members,
 // mantiene la org seleccionada (persistida) y la propaga a las Edge Functions
@@ -66,6 +67,29 @@ export function OrgProvider({ children }) {
     [orgs, currentOrgId],
   )
 
+  // Ámbito de ciudades del miembro actual (rol "visor"). Se lee por separado y de forma
+  // tolerante: si la columna city_scope aún no existe (migración sin aplicar) o hay error,
+  // se asume sin restricción (null) para no romper la app.
+  const [cityScope, setCityScope] = useState(null)
+  useEffect(() => {
+    let cancelled = false
+    if (!user?.id || !currentOrgId) {
+      setCityScope(null)
+      return undefined
+    }
+    supabase
+      .from('org_members')
+      .select('city_scope')
+      .eq('org_id', currentOrgId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        setCityScope(error ? null : normalizeScope(data?.city_scope))
+      })
+    return () => { cancelled = true }
+  }, [user?.id, currentOrgId, orgs])
+
   // Propaga a las cabeceras de las Edge Functions + localStorage SOLO un org que el
   // usuario tenga de verdad. Si el guardado está obsoleto (p. ej. su org se borró o
   // dejó de ser miembro) no se manda nada hasta que reload() lo corrige: así se evita
@@ -83,6 +107,11 @@ export function OrgProvider({ children }) {
 
   const switchOrg = useCallback((id) => setCurrentOrgId(id), [])
 
+  // El ámbito de ciudades SOLO restringe a los visores. Para owner/admin/member es null
+  // (ven todo) aunque quedara un city_scope antiguo en su fila tras un cambio de rol.
+  const isViewer = currentOrg?.role === 'viewer'
+  const effectiveScope = isViewer ? cityScope : null
+
   const value = useMemo(
     () => ({
       orgs,
@@ -90,12 +119,15 @@ export function OrgProvider({ children }) {
       currentOrgId,
       role: currentOrg?.role || null,
       isOwnerOrAdmin: currentOrg?.role === 'owner' || currentOrg?.role === 'admin',
+      isViewer,
+      cityScope: effectiveScope, // array canónico de ciudades permitidas, o null (sin restricción)
+      canSeeCity: (city) => cityInScope(city, effectiveScope),
       loading,
       hasOrg: orgs.length > 0,
       switchOrg,
       reload,
     }),
-    [orgs, currentOrg, currentOrgId, loading, switchOrg, reload],
+    [orgs, currentOrg, currentOrgId, isViewer, effectiveScope, loading, switchOrg, reload],
   )
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>

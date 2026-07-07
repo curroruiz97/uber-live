@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import clsx from 'clsx'
 import { Building2, Users, Plug, CreditCard, Palette, Bell, ShieldCheck, CalendarClock } from 'lucide-react'
+import { useOrg } from '../../state/OrgContext'
 import AccountCompanySection from './sections/AccountCompanySection'
 import TeamSection from './sections/TeamSection'
 import IntegrationsSection from './sections/IntegrationsSection'
@@ -9,6 +10,7 @@ import BrandingSection from './sections/BrandingSection'
 import NotificationsSection from './sections/NotificationsSection'
 import SecuritySection from './sections/SecuritySection'
 import SchedulesSection from './sections/SchedulesSection'
+import { VIEWER_SETTINGS } from '../../config/nav'
 
 const SECTIONS = [
   { id: 'cuenta', label: 'Cuenta y empresa', icon: Building2, Comp: AccountCompanySection },
@@ -22,15 +24,17 @@ const SECTIONS = [
 ]
 
 export default function SettingsLayout() {
-  const [active, setActive] = useState('cuenta')
-  const current = SECTIONS.find((s) => s.id === active) || SECTIONS[0]
+  const { isViewer } = useOrg()
+  const sections = isViewer ? SECTIONS.filter((s) => VIEWER_SETTINGS.has(s.id)) : SECTIONS
+  const [active, setActive] = useState(sections[0].id)
+  const current = sections.find((s) => s.id === active) || sections[0]
   const Comp = current.Comp
 
   return (
     <div className="w-full">
       {/* Móvil: tabs horizontales */}
       <div className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1 pb-1 md:hidden">
-        {SECTIONS.map((s) => {
+        {sections.map((s) => {
           const Icon = s.icon
           return (
             <button
@@ -52,7 +56,7 @@ export default function SettingsLayout() {
         {/* Escritorio: sub-nav lateral */}
         <nav className="hidden md:block">
           <div className="sticky top-20 space-y-1">
-            {SECTIONS.map((s) => {
+            {sections.map((s) => {
               const Icon = s.icon
               const on = active === s.id
               return (

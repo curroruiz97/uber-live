@@ -6,6 +6,7 @@ import { buildDaily, deriveAlerts, canonCity, DEFAULT_CFG } from '../domain/comp
 import { buildPayloadFromCsv, chunk } from '../utils/glovoDaily'
 import { suggestMatches, autoLinkPairs, normName } from '../utils/identityMatch'
 import { isoLocal } from '../utils/period'
+import { cityInScope } from '../utils/cityScope'
 
 const SchedulesContext = createContext(null)
 
@@ -98,7 +99,7 @@ function buildDemo(days = 35) {
 
 export function SchedulesProvider({ children }) {
   const { demoMode } = useApp()
-  const { currentOrgId: orgId, isOwnerOrAdmin } = useOrg()
+  const { currentOrgId: orgId, isOwnerOrAdmin, cityScope } = useOrg()
 
   const [cfg, setCfg] = useState(DEFAULT_CFG)
   const [shiftPlans, setShiftPlans] = useState([])
@@ -204,7 +205,12 @@ export function SchedulesProvider({ children }) {
     () => buildDaily(shiftPlans, absences, rawStats, span.from, span.to, cfg),
     [shiftPlans, absences, rawStats, span.from, span.to, cfg],
   )
-  const alerts = useMemo(() => deriveAlerts(daily, cfg), [daily, cfg])
+  // Rol "visor": recorta cumplimiento a las ciudades permitidas. null => sin restricción.
+  const scopedDaily = useMemo(
+    () => (cityScope ? daily.filter((d) => cityInScope(d.city, cityScope)) : daily),
+    [daily, cityScope],
+  )
+  const alerts = useMemo(() => deriveAlerts(scopedDaily, cfg), [scopedDaily, cfg])
 
   // Identidad: nombres de turno sin teléfono y candidatos del roster.
   const unlinkedNames = useMemo(() => {
@@ -330,6 +336,16 @@ export function SchedulesProvider({ children }) {
       .sort((a, b) => b.lastActive.localeCompare(a.lastActive))
   }, [rawStats])
 
+  // Versiones acotadas al ámbito de ciudades del visor (null => sin restricción).
+  const scopedRoster = useMemo(
+    () => (cityScope ? roster.filter((r) => cityInScope(r.city, cityScope)) : roster),
+    [roster, cityScope],
+  )
+  const scopedUnscheduled = useMemo(
+    () => (cityScope ? unscheduledRiders.filter((r) => cityInScope(r.city, cityScope)) : unscheduledRiders),
+    [unscheduledRiders, cityScope],
+  )
+
   const stats = useMemo(() => {
     const linkedRiders = new Set(shiftPlans.filter((s) => s.rider_key).map((s) => s.rider_key))
     return {
@@ -346,14 +362,14 @@ export function SchedulesProvider({ children }) {
   const value = useMemo(
     () => ({
       cfg, setCfg, saveCfg,
-      roster, shiftPlans, absences, rawStats, imports,
-      daily, alerts, unseenAlerts, suggestions, unlinkedNames,
-      unscheduledRiders, stats, span, dataRange,
+      roster: scopedRoster, shiftPlans, absences, rawStats, imports,
+      daily: scopedDaily, alerts, unseenAlerts, suggestions, unlinkedNames,
+      unscheduledRiders: scopedUnscheduled, stats, span, dataRange,
       loading, demoMode, isOwnerOrAdmin,
       importGlovoDaily, linkRiders, autoLink, linkOne,
       reload: demoMode ? loadDemo : loadReal,
     }),
-    [cfg, saveCfg, roster, shiftPlans, absences, rawStats, imports, daily, alerts, unseenAlerts, suggestions, unlinkedNames, unscheduledRiders, stats, span, dataRange, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, loadDemo, loadReal],
+    [cfg, saveCfg, scopedRoster, shiftPlans, absences, rawStats, imports, scopedDaily, alerts, unseenAlerts, suggestions, unlinkedNames, scopedUnscheduled, stats, span, dataRange, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, loadDemo, loadReal],
   )
 
   return <SchedulesContext.Provider value={value}>{children}</SchedulesContext.Provider>

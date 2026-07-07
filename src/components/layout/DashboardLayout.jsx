@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { useApp } from '../../state/AppContext'
+import { useOrg } from '../../state/OrgContext'
 import { useFleetData, FleetContext } from '../../state/useFleetData'
 import { useToast } from '../../state/toast'
+import { VIEWER_NAV } from '../../config/nav'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import BottomTabBar from './BottomTabBar'
@@ -102,7 +104,13 @@ function Content({ activeNav }) {
 
 export default function DashboardLayout() {
   const app = useApp()
-  const { selectedRiderId, clearSelection } = app
+  const { cityScope, isViewer } = useOrg()
+  const { selectedRiderId, clearSelection, activeNav, setActiveNav } = app
+
+  // El visor no puede aterrizar en una sección oculta (p. ej. una persistida de antes).
+  useEffect(() => {
+    if (isViewer && !VIEWER_NAV.has(activeNav)) setActiveNav('dashboard')
+  }, [isViewer, activeNav, setActiveNav])
   const fleet = useFleetData(
     {
       demoMode: app.demoMode,
@@ -111,6 +119,7 @@ export default function DashboardLayout() {
       connected: app.connected,
     },
     app.activeProvider,
+    cityScope,
   )
   const { toast } = useToast()
   const [mobileOpen, setMobileOpen] = useState(false)

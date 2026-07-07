@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     return json(403, { error: 'No tienes permisos para invitar' })
   }
 
-  let body: { email?: string; role?: string }
+  let body: { email?: string; role?: string; city_scope?: unknown }
   try {
     body = await req.json()
   } catch {
@@ -55,9 +55,20 @@ Deno.serve(async (req) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json(400, { error: 'Email no válido' })
   }
-  if (!['member', 'admin'].includes(role)) {
-    return json(400, { error: 'Role debe ser member o admin' })
+  if (!['member', 'admin', 'viewer'].includes(role)) {
+    return json(400, { error: 'Role debe ser member, admin o viewer' })
   }
+
+  // Ámbito de ciudades (opcional): lista de nombres de ciudad que este usuario podrá ver.
+  // Solo tiene sentido para roles de lectura; para admin/owner se ignora (ven todo).
+  let cityScope: string[] | null = null
+  if (Array.isArray(body.city_scope)) {
+    const cleaned = body.city_scope
+      .map((c) => String(c || '').trim())
+      .filter((c) => c.length > 0)
+    cityScope = cleaned.length ? cleaned : null
+  }
+  if (role === 'admin') cityScope = null
 
   // Comprobar si ya es miembro de la org (buscar por email via RPC que une auth.users)
   const { data: allMembers } = await adminClient.rpc('list_org_members', { p_org: orgId })
@@ -86,6 +97,7 @@ Deno.serve(async (req) => {
     org_id: orgId,
     email,
     role,
+    city_scope: cityScope,
     invited_by: user.id,
   })
   if (insertErr) return json(500, { error: insertErr.message })

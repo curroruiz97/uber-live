@@ -1,10 +1,12 @@
 import clsx from 'clsx'
 import { Map as MapIcon, Users, MessageCircle, Settings, ShieldCheck, CalendarDays, Activity } from 'lucide-react'
 import { useApp } from '../../state/AppContext'
+import { useOrg } from '../../state/OrgContext'
 import { useWhatsApp } from '../../state/whatsapp'
 import { useMensatek } from '../../state/mensatek'
 import { useSchedules } from '../../state/schedules'
 import { selection } from '../../native/haptics'
+import { VIEWER_NAV } from '../../config/nav'
 
 // La pestaña "Mensajes" agrupa WhatsApp + Mensatek (dentro se cambia con un segmented).
 const MESSAGING = ['whatsapp', 'mensatek']
@@ -23,10 +25,13 @@ const TABS = [
 // con safe area, badge de mensajes del día y feedback háptico al cambiar.
 export default function BottomTabBar() {
   const { activeNav, setActiveNav } = useApp()
+  const { isViewer } = useOrg()
   const { messagesToday: waToday } = useWhatsApp()
   const { messagesToday: mkToday } = useMensatek()
   const { unseenAlerts } = useSchedules()
   const msgBadge = (waToday || 0) + (mkToday || 0)
+  // El visor solo ve las pestañas de lectura ('mensajes'/'horarios' quedan fuera).
+  const tabs = isViewer ? TABS.filter((t) => VIEWER_NAV.has(t.id)) : TABS
 
   function isActive(tab) {
     if (tab.id === 'mensajes') return MESSAGING.includes(activeNav)
@@ -45,8 +50,8 @@ export default function BottomTabBar() {
 
   return (
     <nav className="app-tabbar fixed inset-x-0 bottom-0 z-30 border-t border-line bg-app/90 pb-safe backdrop-blur md:hidden">
-      <div className="mx-auto grid max-w-lg grid-cols-7">
-        {TABS.map((tab) => {
+      <div className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+        {tabs.map((tab) => {
           const Icon = tab.icon
           const on = isActive(tab)
           const badgeCount = tab.id === 'mensajes' ? msgBadge : tab.id === 'cumplimiento' ? unseenAlerts : 0

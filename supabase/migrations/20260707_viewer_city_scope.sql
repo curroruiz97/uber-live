@@ -6,6 +6,8 @@
 -- Idempotente: se puede aplicar más de una vez sin efectos secundarios.
 -- =====================================================================
 
+begin;
+
 -- ===== 1. Ampliar los CHECK de role para incluir 'viewer' =====
 -- Elimina CUALQUIER CHECK sobre la columna role (sea cual sea su nombre auto-generado)
 -- en ambas tablas, para no dejar un constraint antiguo que rechace 'viewer'.
@@ -33,6 +35,9 @@ alter table public.org_members     add column if not exists city_scope text[];
 alter table public.org_invitations add column if not exists city_scope text[];
 
 -- ===== 3. list_org_members ahora devuelve también city_scope =====
+-- Cambia el tipo de retorno (añade city_scope), así que hay que DROP antes de recrear
+-- (CREATE OR REPLACE no permite cambiar el tipo de retorno).
+drop function if exists public.list_org_members(uuid);
 create or replace function public.list_org_members(p_org uuid)
 returns table(user_id uuid, email text, full_name text, role text, city_scope text[], created_at timestamptz)
 language sql security definer set search_path = public as $$
@@ -49,6 +54,8 @@ grant execute on function public.list_org_members(uuid) to authenticated;
 -- ===== 4. accept_pending_invitations: crea la membresía copiando role + city_scope =====
 -- Acepta automáticamente las invitaciones pendientes (no caducadas) del email del usuario
 -- que inicia sesión, trasladando el rol y el ámbito de ciudades definidos en la invitación.
+-- DROP previo por si la firma/tipo de retorno de la versión existente difiere.
+drop function if exists public.accept_pending_invitations();
 create or replace function public.accept_pending_invitations()
 returns integer language plpgsql security definer set search_path = public as $$
 declare v_email text; v_count int := 0;
@@ -77,3 +84,5 @@ begin
 end $$;
 revoke execute on function public.accept_pending_invitations() from public;
 grant execute on function public.accept_pending_invitations() to authenticated;
+
+commit;

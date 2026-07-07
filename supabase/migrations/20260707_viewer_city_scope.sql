@@ -7,12 +7,25 @@
 -- =====================================================================
 
 -- ===== 1. Ampliar los CHECK de role para incluir 'viewer' =====
-alter table public.org_members     drop constraint if exists org_members_role_check;
-alter table public.org_members     add  constraint org_members_role_check
-  check (role in ('owner','admin','member','viewer'));
+-- Elimina CUALQUIER CHECK sobre la columna role (sea cual sea su nombre auto-generado)
+-- en ambas tablas, para no dejar un constraint antiguo que rechace 'viewer'.
+do $$
+declare r record;
+begin
+  for r in
+    select conrelid::regclass::text as tbl, conname
+    from pg_constraint
+    where conrelid in ('public.org_members'::regclass, 'public.org_invitations'::regclass)
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%role%'
+  loop
+    execute format('alter table %s drop constraint %I', r.tbl, r.conname);
+  end loop;
+end $$;
 
-alter table public.org_invitations drop constraint if exists org_invitations_role_check;
-alter table public.org_invitations add  constraint org_invitations_role_check
+alter table public.org_members     add constraint org_members_role_check
+  check (role in ('owner','admin','member','viewer'));
+alter table public.org_invitations add constraint org_invitations_role_check
   check (role in ('owner','admin','member','viewer'));
 
 -- ===== 2. Columna city_scope (null = sin restricción; array = ciudades permitidas) =====

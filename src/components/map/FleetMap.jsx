@@ -66,6 +66,10 @@ function MapLegend({ fullscreen }) {
           </div>
         )
       })}
+      <div className="mt-0.5 flex items-center gap-1.5 border-t border-line-strong pt-1">
+        <span className="h-2 w-2 rounded-full" style={{ background: '#ef4444' }} />
+        <span className="text-muted">Debería estar conectado</span>
+      </div>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { Marker, Popup } from 'react-leaflet'
 import { STATUS } from '../../config/constants'
 import { useWhatsApp } from '../../state/whatsapp'
 import { waLink, buildMessage } from '../../utils/whatsapp'
+import { shiftDelaySeconds, fmtDelay } from '../../utils/shiftTime'
 import WhatsAppIcon from '../common/WhatsAppIcon'
 
 function buildIcon(status, active, selected, missingShift) {
@@ -49,9 +50,13 @@ export default function RiderMarker({ rider, selected, onSelect, shiftInfo }) {
             </p>
           )}
           {shiftInfo && rider.status === 'offline' && (
-            <p className="mt-1.5 rounded bg-red-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-red-600">
-              ⚠ Turno {shiftInfo.inicio}–{shiftInfo.fin} · No conectado
-            </p>
+            <div className="mt-1.5 rounded bg-red-500/10 px-1.5 py-1 text-[11px] font-semibold text-red-600">
+              <p>⚠ Turno {shiftInfo.inicio}–{shiftInfo.fin} · No conectado</p>
+              {(() => {
+                const sec = shiftDelaySeconds(shiftInfo.inicio)
+                return sec ? <p className="mt-0.5 font-normal">Retraso: {fmtDelay(sec)}</p> : null
+              })()}
+            </div>
           )}
           {shiftInfo && rider.status !== 'offline' && (
             <p className="mt-1.5 text-[11px] text-emerald-600">

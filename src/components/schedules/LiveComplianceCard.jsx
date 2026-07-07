@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { Radio, UserCheck, UserX, Clock, AlertCircle } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
+import { useOrg } from '../../state/OrgContext'
 import { useFleet } from '../../state/useFleetData'
 import { getRidersOnShiftNow } from '../../domain/compliance'
 import { digits } from '../../utils/glovoDaily'
+import { shiftDelaySeconds, fmtDelay, toHHMM, connectDeltaMin } from '../../utils/shiftTime'
+import { supabase } from '../../lib/supabase'
 import SectionCard from './SectionCard'
 
 function StatusDot({ color }) {
@@ -18,8 +21,10 @@ function phoneSuffix(s) {
 
 export default function LiveComplianceCard() {
   const { shiftPlans, demoMode } = useSchedules()
+  const { currentOrgId: orgId } = useOrg()
   const { riders: fleetRiders } = useFleet()
   const [now, setNow] = useState(() => new Date())
+  const [firstOnline, setFirstOnline] = useState(() => new Map())
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000)
@@ -27,6 +32,38 @@ export default function LiveComplianceCard() {
   }, [])
 
   const onShift = useMemo(() => getRidersOnShiftNow(shiftPlans, now), [shiftPlans, now])
+  const onShiftKeys = useMemo(() => onShift.map((s) => s.riderKey).filter(Boolean), [onShift])
+
+  // Hora real de PRIMERA conexión de hoy por rider (muestras de actividad cada ~10 min),
+  // para compararla con la hora de inicio del turno. Se acota a los riders en turno.
+  useEffect(() => {
+    if (!orgId || demoMode || !onShiftKeys.length) {
+      setFirstOnline(new Map())
+      return undefined
+    }
+    let cancelled = false
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    supabase
+      .from('rider_activity_samples')
+      .select('rider_key, captured_at')
+      .eq('org_id', orgId)
+      .eq('online', true)
+      .gte('captured_at', start.toISOString())
+      .in('rider_key', onShiftKeys)
+      .order('captured_at', { ascending: true })
+      .limit(1000)
+      .then(({ data, error }) => {
+        if (cancelled) return
+        const m = new Map()
+        if (!error) for (const s of data || []) {
+          const k = phoneSuffix(s.rider_key)
+          if (!m.has(k)) m.set(k, s.captured_at) // primera (ascendente) = conexión más temprana
+        }
+        setFirstOnline(m)
+      })
+    return () => { cancelled = true }
+  }, [orgId, demoMode, onShiftKeys, now])
 
   const fleetByPhone = useMemo(() => {
     const map = new Map()
@@ -103,14 +140,17 @@ export default function LiveComplianceCard() {
             </div>
             <div className="overflow-hidden rounded-lg border border-red-200 dark:border-red-900/40">
               <div className="max-h-40 divide-y divide-line overflow-y-auto">
-                {classified.missing.map((r) => (
-                  <div key={r.riderKey} className="flex items-center gap-2 px-3 py-1.5">
-                    <StatusDot color="bg-red-500" />
-                    <span className="min-w-0 flex-1 truncate text-xs text-fg">{r.name}</span>
-                    <span className="shrink-0 text-[10px] text-faint">{r.inicio}–{r.fin}</span>
-                    {r.city && <span className="shrink-0 text-[10px] text-faint">{r.city}</span>}
-                  </div>
-                ))}
+                {classified.missing.map((r) => {
+                  const sec = shiftDelaySeconds(r.inicio, now)
+                  return (
+                    <div key={r.riderKey} className="flex items-center gap-2 px-3 py-1.5">
+                      <StatusDot color="bg-red-500" />
+                      <span className="min-w-0 flex-1 truncate text-xs text-fg">{r.name}</span>
+                      {sec ? <span className="shrink-0 text-[10px] font-semibold text-red-600 dark:text-red-400">{fmtDelay(sec)} tarde</span> : null}
+                      <span className="shrink-0 text-[10px] text-faint">{r.inicio}–{r.fin}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -121,13 +161,23 @@ export default function LiveComplianceCard() {
             <div className="mb-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">Conectados en turno</div>
             <div className="overflow-hidden rounded-lg border border-line">
               <div className="max-h-40 divide-y divide-line overflow-y-auto">
-                {classified.connected.map((r) => (
-                  <div key={r.riderKey} className="flex items-center gap-2 px-3 py-1.5">
-                    <StatusDot color={r.status === 'en_entrega' ? 'bg-sky-500' : r.status === 'en_ruta' ? 'bg-amber-500' : 'bg-emerald-500'} />
-                    <span className="min-w-0 flex-1 truncate text-xs text-fg">{r.fleetName || r.name}</span>
-                    <span className="shrink-0 text-[10px] text-faint">{r.inicio}–{r.fin}</span>
-                  </div>
-                ))}
+                {classified.connected.map((r) => {
+                  const connectedAt = firstOnline.get(phoneSuffix(r.riderKey))
+                  const delta = connectDeltaMin(r.inicio, connectedAt)
+                  const late = delta != null && delta > 5
+                  return (
+                    <div key={r.riderKey} className="flex items-center gap-2 px-3 py-1.5">
+                      <StatusDot color={r.status === 'en_entrega' ? 'bg-sky-500' : r.status === 'en_ruta' ? 'bg-amber-500' : 'bg-emerald-500'} />
+                      <span className="min-w-0 flex-1 truncate text-xs text-fg">{r.fleetName || r.name}</span>
+                      {connectedAt && (
+                        <span className={clsx('shrink-0 text-[10px] font-medium', late ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400')}>
+                          conectó {toHHMM(connectedAt)}{delta != null ? (late ? ` · +${delta}m` : delta < -1 ? ` · ${delta}m` : ' · puntual') : ''}
+                        </span>
+                      )}
+                      <span className="shrink-0 text-[10px] text-faint">{r.inicio}–{r.fin}</span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>

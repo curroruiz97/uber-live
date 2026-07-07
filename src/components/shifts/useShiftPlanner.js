@@ -81,16 +81,29 @@ export function useShiftPlanner() {
     [orgId, crossPhone],
   )
 
+  // Escribe PRIMERO y confirma que persistió. Si la RLS bloquea (no owner/admin),
+  // Supabase no da error pero afecta 0 filas: con .select() lo detectamos y avisamos,
+  // en vez de mostrar el cambio y que "se resetee" al recargar.
   const updateShift = useCallback(async (id, patch) => {
-    setShifts((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
-    const { error } = await supabase.from('shift_plans').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id)
+    const { data, error } = await supabase
+      .from('shift_plans')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
     if (error) throw new Error(error.message)
+    if (!data || !data.length) {
+      throw new Error('No se pudo guardar el turno: necesitas permisos de propietario o administrador (o el turno ya no existe).')
+    }
+    setShifts((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)))
   }, [])
 
   const removeShift = useCallback(async (id) => {
-    setShifts((prev) => prev.filter((s) => s.id !== id))
-    const { error } = await supabase.from('shift_plans').delete().eq('id', id)
+    const { data, error } = await supabase.from('shift_plans').delete().eq('id', id).select()
     if (error) throw new Error(error.message)
+    if (!data || !data.length) {
+      throw new Error('No se pudo eliminar el turno: necesitas permisos de propietario o administrador.')
+    }
+    setShifts((prev) => prev.filter((s) => s.id !== id))
   }, [])
 
   // ---- CRUD estados/ausencias ----
@@ -119,32 +132,30 @@ export function useShiftPlanner() {
   )
 
   // Al cambiar fecha_inicio o días recalcula fecha_fin (previsión de días no trabajables).
+  // Escribe primero y confirma persistencia (misma protección RLS que los turnos).
   const updateAbsence = useCallback(async (id, patch) => {
-    setAbsences((prev) =>
-      prev.map((a) => {
-        if (a.id !== id) return a
-        const next = { ...a, ...patch }
-        if ('fecha_inicio' in patch || 'dias' in patch) {
-          next.fecha_fin = next.fecha_inicio && next.dias ? addDaysIso(next.fecha_inicio, Math.max(0, Number(next.dias) - 1)) : null
-        }
-        return next
-      }),
-    )
+    const base = absences.find((a) => a.id === id) || {}
     const full = { ...patch }
     if ('fecha_inicio' in patch || 'dias' in patch) {
-      const base = absences.find((a) => a.id === id) || {}
       const fi = patch.fecha_inicio ?? base.fecha_inicio
       const di = patch.dias ?? base.dias
       full.fecha_fin = fi && di ? addDaysIso(fi, Math.max(0, Number(di) - 1)) : null
     }
-    const { error } = await supabase.from('rider_absences').update({ ...full, updated_at: new Date().toISOString() }).eq('id', id)
+    const { data, error } = await supabase.from('rider_absences').update({ ...full, updated_at: new Date().toISOString() }).eq('id', id).select()
     if (error) throw new Error(error.message)
+    if (!data || !data.length) {
+      throw new Error('No se pudo guardar el estado: necesitas permisos de propietario o administrador.')
+    }
+    setAbsences((prev) => prev.map((a) => (a.id === id ? { ...a, ...full } : a)))
   }, [absences])
 
   const removeAbsence = useCallback(async (id) => {
-    setAbsences((prev) => prev.filter((a) => a.id !== id))
-    const { error } = await supabase.from('rider_absences').delete().eq('id', id)
+    const { data, error } = await supabase.from('rider_absences').delete().eq('id', id).select()
     if (error) throw new Error(error.message)
+    if (!data || !data.length) {
+      throw new Error('No se pudo eliminar el estado: necesitas permisos de propietario o administrador.')
+    }
+    setAbsences((prev) => prev.filter((a) => a.id !== id))
   }, [])
 
   // Importa el seed (datos verificados de los PDFs). Idempotente: reemplaza los turnos y

@@ -1,3 +1,7 @@
+// Polyfills para WebView de Android antiguos (Object.fromEntries, Promise.allSettled,
+// Array.flat, String.replaceAll, etc.). Debe ir el primero de todo. Complementa el
+// polyfill de globalThis inyectado en index.html y el target ES2015 del build.
+import 'core-js/stable'
 import ReactDOM from 'react-dom/client'
 import '@fontsource-variable/inter'
 import 'leaflet/dist/leaflet.css'

@@ -10,6 +10,12 @@ export default defineConfig(() => {
   // inyecta el host, p. ej. Railway).
   return {
     plugins: [react()],
+    // Compatibilidad con WebView de Android antiguos (los móviles de la flota): sin esto
+    // el build deja sintaxis moderna (?? y ?. de 2020) que los WebView < Chrome 80 no
+    // saben leer -> "Unexpected token ?" -> pantalla en blanco. Transpilamos a ES2015.
+    build: {
+      target: ['es2015', 'chrome63', 'safari11'],
+    },
     server: {
       port: 5173,
       proxy: {

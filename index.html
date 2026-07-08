@@ -7,6 +7,14 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"
     />
     <script>
+      // Polyfill de globalThis para WebView de Android antiguos (< Chrome 71), que si no
+      // lanzan "globalThis is not defined" al cargar el bundle -> pantalla en blanco.
+      // Debe ir ANTES que cualquier módulo. El resto de APIs modernas las cubre core-js.
+      if (typeof globalThis === 'undefined') {
+        (typeof self !== 'undefined' ? self : window).globalThis = typeof self !== 'undefined' ? self : window
+      }
+    </script>
+    <script>
       // Anti-FOUC: aplica el tema guardado antes de que React monte.
       (function () {
         try {

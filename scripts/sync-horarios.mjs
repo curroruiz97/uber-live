@@ -15,6 +15,7 @@ import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import ExcelJS from 'exceljs'
 import { createClient } from '@supabase/supabase-js'
+import { matchKey } from '../src/utils/identityMatch.js'
 
 const ROOT = resolve(fileURLToPath(import.meta.url), '../..')
 const env = {}
@@ -143,10 +144,28 @@ async function main() {
 
   const { data: roster } = await supabase.from('rider_roster').select('name, phone').eq('org_id', orgId)
   const phoneByName = new Map((roster || []).filter((r) => r.phone).map((r) => [normName(r.name), r.phone]))
-  const rows = weekShifts.map((s) => {
+
+  // Riders dados de baja ("despedidos"): no deben re-insertarse en shift_plans. Doble
+  // clave (rider_key por teléfono + name_norm por nombre). Defensivo si la tabla no existe.
+  const { data: exclData, error: exclErr } = await supabase
+    .from('rider_exclusions').select('name_norm, rider_key, active').eq('org_id', orgId)
+  const exKeys = new Set()
+  const exNames = new Set()
+  for (const e of (exclErr ? [] : (exclData || []))) {
+    if (e.active === false) continue
+    if (e.rider_key) exKeys.add(String(e.rider_key))
+    if (e.name_norm) exNames.add(String(e.name_norm))
+  }
+  const isExcluded = (name, key) => (key && exKeys.has(String(key))) || exNames.has(matchKey(name))
+
+  const allRows = weekShifts.map((s) => {
     const phone = phoneByName.get(normName(s.rider_name)) || null
     return { org_id: orgId, provider: 'uber', city: s.city, rider_name: s.rider_name, rider_phone: phone, rider_key: phone ? digits(phone) : null, dia: s.dia, turno: s.turno, hora_inicio: s.hora_inicio, hora_fin: s.hora_fin, sort: 0 }
   })
+  const rows = allRows.filter((r) => !isExcluded(r.rider_name, r.rider_key))
+  const skippedExcluded = allRows.length - rows.length
+  if (exclErr) console.log('Aviso: no se pudo leer rider_exclusions (¿tabla no migrada aún?). No se filtran bajas.')
+  else if (skippedExcluded) console.log(`Bajas aplicadas: ${skippedExcluded} turno(s) de riders dados de baja omitidos.`)
   console.log(`Cruce por teléfono: ${rows.filter((r) => r.rider_key).length}/${rows.length} vinculados.`)
 
   // Borrado por lotes pequeños: un DELETE grande con RLS por fila supera el statement

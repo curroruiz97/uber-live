@@ -5,6 +5,8 @@ import { useOrg } from './OrgContext'
 import { buildDaily, deriveAlerts, canonCity, DEFAULT_CFG } from '../domain/compliance'
 import { buildPayloadFromCsv, chunk } from '../utils/glovoDaily'
 import { suggestMatches, autoLinkPairs, normName } from '../utils/identityMatch'
+import { buildExclusionSets, filterExcludedShiftPlans, filterExcludedStats, filterExcludedRoster } from '../domain/exclusions'
+import { buildRiderCandidates } from '../utils/riderList'
 import { isoLocal } from '../utils/period'
 import { cityInScope } from '../utils/cityScope'
 
@@ -107,6 +109,7 @@ export function SchedulesProvider({ children }) {
   const [rawStats, setRawStats] = useState([])
   const [roster, setRoster] = useState([])
   const [imports, setImports] = useState([])
+  const [exclusions, setExclusions] = useState([])
   const [loading, setLoading] = useState(true)
   const demoRef = useRef(null)
 
@@ -120,6 +123,7 @@ export function SchedulesProvider({ children }) {
     setRawStats(d.stats)
     setRoster(d.roster)
     setImports([])
+    setExclusions([])
     setCfg(DEFAULT_CFG)
     setLoading(false)
   }, [])
@@ -150,13 +154,15 @@ export function SchedulesProvider({ children }) {
         return { data: all, error: null }
       }
 
-      const [st, ro, sp, ab, stats, imp] = await Promise.all([
+      const [st, ro, sp, ab, stats, imp, exc] = await Promise.all([
         supabase.from('org_settings').select('schedule_config').eq('org_id', orgId).maybeSingle(),
         supabase.from('rider_roster').select('*').eq('org_id', orgId),
         supabase.from('shift_plans').select('*').eq('org_id', orgId),
         supabase.from('rider_absences').select('*').eq('org_id', orgId),
         fetchAllStats(),
         supabase.from('glovo_imports').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(30),
+        // Bajas de riders. Defensivo: si la tabla no existe aún, no debe romper la carga.
+        supabase.from('rider_exclusions').select('*').eq('org_id', orgId),
       ])
       if (sp.error || stats.error) {
         loadDemo()
@@ -178,6 +184,7 @@ export function SchedulesProvider({ children }) {
       setAbsences(ab.data || [])
       setRawStats(stats.data || [])
       setImports(imp.data || [])
+      setExclusions(exc.error ? [] : (exc.data || []))
       setLoading(false)
     } catch {
       loadDemo()
@@ -189,21 +196,28 @@ export function SchedulesProvider({ children }) {
     else loadReal()
   }, [demoMode, loadDemo, loadReal])
 
+  // Bajas de riders ("despedidos"): se filtran de turnos/actividad/roster ANTES de calcular
+  // cumplimiento, para ocultarlos en TODAS las vistas sin borrar su histórico. Reversible.
+  const exclusionSets = useMemo(() => buildExclusionSets(exclusions), [exclusions])
+  const fShiftPlans = useMemo(() => filterExcludedShiftPlans(shiftPlans, exclusionSets), [shiftPlans, exclusionSets])
+  const fRawStats = useMemo(() => filterExcludedStats(rawStats, exclusionSets), [rawStats, exclusionSets])
+  const fRoster = useMemo(() => filterExcludedRoster(roster, exclusionSets), [roster, exclusionSets])
+
   const dataRange = useMemo(() => {
-    if (!rawStats.length) return null
-    let first = rawStats[0].work_date
-    let last = rawStats[0].work_date
-    for (const r of rawStats) {
+    if (!fRawStats.length) return null
+    let first = fRawStats[0].work_date
+    let last = fRawStats[0].work_date
+    for (const r of fRawStats) {
       if (r.work_date < first) first = r.work_date
       if (r.work_date > last) last = r.work_date
     }
     return { first, last }
-  }, [rawStats])
+  }, [fRawStats])
 
   // Cruce turnos × actividad (cálculo puro, memorizado).
   const daily = useMemo(
-    () => buildDaily(shiftPlans, absences, rawStats, span.from, span.to, cfg),
-    [shiftPlans, absences, rawStats, span.from, span.to, cfg],
+    () => buildDaily(fShiftPlans, absences, fRawStats, span.from, span.to, cfg),
+    [fShiftPlans, absences, fRawStats, span.from, span.to, cfg],
   )
   // Rol "visor": recorta cumplimiento a las ciudades permitidas. null => sin restricción.
   const scopedDaily = useMemo(
@@ -216,7 +230,7 @@ export function SchedulesProvider({ children }) {
   const unlinkedNames = useMemo(() => {
     const seen = new Set()
     const out = []
-    for (const s of shiftPlans) {
+    for (const s of fShiftPlans) {
       if (s.rider_key) continue
       const k = `${s.provider}|${s.rider_name}`
       if (seen.has(k)) continue
@@ -224,9 +238,9 @@ export function SchedulesProvider({ children }) {
       out.push({ rider_name: s.rider_name, provider: s.provider || 'uber', city: s.city || null })
     }
     return out
-  }, [shiftPlans])
+  }, [fShiftPlans])
 
-  const candidates = useMemo(() => roster.filter((r) => r.phone || r.riderKey).map((r) => ({ rider_key: r.riderKey, name: r.name, phone: r.phone })), [roster])
+  const candidates = useMemo(() => fRoster.filter((r) => r.phone || r.riderKey).map((r) => ({ rider_key: r.riderKey, name: r.name, phone: r.phone })), [fRoster])
   const suggestions = useMemo(() => suggestMatches(unlinkedNames, candidates), [unlinkedNames, candidates])
 
   // Importa CSV(s) de actividad (uno o varios). onProgress({phase,file,index,total,...}).
@@ -308,6 +322,35 @@ export function SchedulesProvider({ children }) {
     [linkRiders],
   )
 
+  // Da de baja a uno o varios riders (los oculta del cumplimiento, reversible).
+  // records: [{ name_norm, rider_key, display_name, reason }].
+  const excludeRiders = useCallback(
+    async (records) => {
+      if (!records?.length) return { excluded: 0 }
+      if (demoMode) return { demo: true }
+      if (!orgId) throw new Error('Sin organización activa')
+      const { data, error } = await supabase.rpc('exclude_riders', { p_org: orgId, p_riders: records })
+      if (error) throw new Error(error.message)
+      await loadReal()
+      return data || {}
+    },
+    [demoMode, orgId, loadReal],
+  )
+
+  // Restaura (reactiva) a un rider dado de baja por su nombre normalizado.
+  const restoreRider = useCallback(
+    async (nameNorm) => {
+      if (!nameNorm) return { restored: 0 }
+      if (demoMode) return { demo: true }
+      if (!orgId) throw new Error('Sin organización activa')
+      const { data, error } = await supabase.rpc('restore_rider', { p_org: orgId, p_name_norm: nameNorm })
+      if (error) throw new Error(error.message)
+      await loadReal()
+      return data || {}
+    },
+    [demoMode, orgId, loadReal],
+  )
+
   // Guarda la configuración de cumplimiento (upsert en org_settings).
   const saveCfg = useCallback(
     async (patch) => {
@@ -326,7 +369,7 @@ export function SchedulesProvider({ children }) {
 
   const unscheduledRiders = useMemo(() => {
     const byKey = new Map()
-    for (const s of rawStats) {
+    for (const s of fRawStats) {
       if (!s.is_unscheduled || !s.rider_key) continue
       const prev = byKey.get(s.rider_key)
       if (!prev || s.work_date > prev.work_date) byKey.set(s.rider_key, s)
@@ -334,12 +377,12 @@ export function SchedulesProvider({ children }) {
     return [...byKey.values()]
       .map((s) => ({ riderKey: s.rider_key, name: s.driver_name || s.rider_key, phone: s.driver_phone || null, city: canonCity(s.city), lastActive: s.work_date }))
       .sort((a, b) => b.lastActive.localeCompare(a.lastActive))
-  }, [rawStats])
+  }, [fRawStats])
 
   // Versiones acotadas al ámbito de ciudades del visor (null => sin restricción).
   const scopedRoster = useMemo(
-    () => (cityScope ? roster.filter((r) => cityInScope(r.city, cityScope)) : roster),
-    [roster, cityScope],
+    () => (cityScope ? fRoster.filter((r) => cityInScope(r.city, cityScope)) : fRoster),
+    [fRoster, cityScope],
   )
   const scopedUnscheduled = useMemo(
     () => (cityScope ? unscheduledRiders.filter((r) => cityInScope(r.city, cityScope)) : unscheduledRiders),
@@ -347,29 +390,44 @@ export function SchedulesProvider({ children }) {
   )
 
   const stats = useMemo(() => {
-    const linkedRiders = new Set(shiftPlans.filter((s) => s.rider_key).map((s) => s.rider_key))
+    const linkedRiders = new Set(fShiftPlans.filter((s) => s.rider_key).map((s) => s.rider_key))
     return {
       riders: linkedRiders.size,
-      shifts: shiftPlans.length,
+      shifts: fShiftPlans.length,
       days: daily.length,
       unlinked: unlinkedNames.length,
-      activityRiders: new Set(rawStats.map((r) => r.rider_key)).size,
+      activityRiders: new Set(fRawStats.map((r) => r.rider_key)).size,
     }
-  }, [shiftPlans, daily, unlinkedNames, rawStats])
+  }, [fShiftPlans, daily, unlinkedNames, fRawStats])
 
   const unseenAlerts = alerts.length
+
+  // Bajas activas (para listarlas en la UI con opción de restaurar), más recientes primero.
+  const activeExclusions = useMemo(
+    () => (exclusions || [])
+      .filter((e) => e.active !== false)
+      .sort((a, b) => String(b.excluded_at || '').localeCompare(String(a.excluded_at || ''))),
+    [exclusions],
+  )
+  // Candidatos de identidad SIN filtrar por baja: para cruzar los nombres subidos con las
+  // identidades conocidas (roster + actividad + turnos) al dar de baja o al reactivar.
+  const riderCandidates = useMemo(
+    () => buildRiderCandidates({ roster, rawStats, shiftPlans }),
+    [roster, rawStats, shiftPlans],
+  )
 
   const value = useMemo(
     () => ({
       cfg, setCfg, saveCfg,
-      roster: scopedRoster, shiftPlans, absences, rawStats, imports,
+      roster: scopedRoster, shiftPlans: fShiftPlans, absences, rawStats: fRawStats, imports,
       daily: scopedDaily, alerts, unseenAlerts, suggestions, unlinkedNames,
       unscheduledRiders: scopedUnscheduled, stats, span, dataRange,
       loading, demoMode, isOwnerOrAdmin,
       importGlovoDaily, linkRiders, autoLink, linkOne,
+      exclusions: activeExclusions, riderCandidates, excludeRiders, restoreRider,
       reload: demoMode ? loadDemo : loadReal,
     }),
-    [cfg, saveCfg, scopedRoster, shiftPlans, absences, rawStats, imports, scopedDaily, alerts, unseenAlerts, suggestions, unlinkedNames, scopedUnscheduled, stats, span, dataRange, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, loadDemo, loadReal],
+    [cfg, saveCfg, scopedRoster, fShiftPlans, absences, fRawStats, imports, scopedDaily, alerts, unseenAlerts, suggestions, unlinkedNames, scopedUnscheduled, stats, span, dataRange, loading, demoMode, isOwnerOrAdmin, importGlovoDaily, linkRiders, autoLink, linkOne, activeExclusions, riderCandidates, excludeRiders, restoreRider, loadDemo, loadReal],
   )
 
   return <SchedulesContext.Provider value={value}>{children}</SchedulesContext.Provider>

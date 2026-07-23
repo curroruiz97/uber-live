@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react'
 import clsx from 'clsx'
-import { Search, Users as UsersIcon, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Search, Users as UsersIcon, ChevronRight, ChevronLeft, UserMinus } from 'lucide-react'
 import { useSchedules } from '../../state/schedules'
 import { buildRiderStats } from '../../domain/compliance'
 import { inRange } from '../../utils/period'
@@ -10,6 +10,7 @@ import Segmented from './Segmented'
 import RangeControls from './RangeControls'
 import { usePeriodRange } from './usePeriodRange'
 import RiderDetailSheet from './RiderDetailSheet'
+import ManageRidersPanel from './ManageRidersPanel'
 import { STATUS_META, pctTone, pctHex } from './statusMeta'
 
 const PAGE_SIZE = 18
@@ -33,12 +34,13 @@ function initials(name) {
 }
 
 export default function RidersTab() {
-  const { daily, roster, loading } = useSchedules()
+  const { daily, roster, loading, isOwnerOrAdmin, demoMode } = useSchedules()
   const ctl = usePeriodRange('month')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState('compliance')
   const [sel, setSel] = useState(null)
   const [page, setPage] = useState(0)
+  const [manage, setManage] = useState(false)
 
   const metaByKey = useMemo(() => {
     const m = new Map()
@@ -70,8 +72,26 @@ export default function RidersTab() {
 
   if (loading) return <div className="py-10 text-center text-sm text-muted">Cargando…</div>
 
+  const canManage = isOwnerOrAdmin || demoMode
+
   return (
     <div className="space-y-4">
+      {canManage && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setManage((v) => !v)}
+            className={clsx(
+              'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition',
+              manage ? 'border-accent/60 bg-accent/10 text-accent' : 'border-line text-muted hover:border-accent/50 hover:text-fg',
+            )}
+          >
+            <UserMinus className="h-3.5 w-3.5" /> Gestionar bajas
+          </button>
+        </div>
+      )}
+
+      {canManage && manage && <ManageRidersPanel onClose={() => setManage(false)} />}
+
       <div className="space-y-2">
         <div className="relative w-full">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
